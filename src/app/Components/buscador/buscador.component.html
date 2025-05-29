@@ -1,0 +1,19 @@
+<h1>buscador D&D</h1>
+
+<div>
+    <form>
+        <input type="text" placeholder="Search D&D">
+        <button type="button">Search</button>
+    </form>
+</div>
+
+ <pre>there is  {{ dndData?.count }} clases on D&D </pre>
+ <ul>
+    @for (item of dndData?.results; track $index) {
+        <li>{{item.name}}</li>
+ }
+ </ul>
+
+ 
+<!-- <button (click)="onFetchSpells()" >Echisos</button>
+<button (click)="onFetchClases()" >clases</button> -->
