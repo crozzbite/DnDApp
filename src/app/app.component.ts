@@ -1,15 +1,13 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { BuscadorComponent } from "./Components/buscador/buscador.component";
-import { FiltradorComponent } from "./Components/filtrador/filtrador.component";
-import { NavarComponent } from "./Components/navar/navar.component";
+import { NavbarComponent } from './core/layout/navbar/navbar.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, BuscadorComponent, FiltradorComponent, NavarComponent],
+  imports: [RouterOutlet, NavbarComponent],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.scss'
+  styleUrl: './app.component.scss',
 })
 export class AppComponent {
   title = 'DnDApp';

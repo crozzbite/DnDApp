@@ -1,15 +1,10 @@
-export interface DndEndpoints {
+export interface DndEndpoints<T> {
     count : number,
-    results: DndClass | DndSpells [] ;
+    results: T[];
 }
 export interface DndClass{
     index:string,
     name:string,
-    url:string
-}
-
-export interface DndSpells extends DndClass{
-    
-    level: number
-   
+    url:string,
+    level?: number
 }

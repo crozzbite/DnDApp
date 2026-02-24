@@ -40,3 +40,18 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# SkullRender Assets (Large binaries)
+/src/assets/docs/
+*.pdf
+
+# Backend
+/backend/node_modules/
+/backend/dist/
+.env
+
+# AI & Workflow Tools
+.agent/
+.gemini/
+.agente/
+/openspec/

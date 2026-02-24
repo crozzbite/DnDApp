@@ -1,5 +1,22 @@
-<h3>hola gente de {{title}}</h3>
-<app-navar></app-navar>
-<!-- <app-buscador></app-buscador> -->
+<!-- <h3>hola gente de {{title}}</h3>
+<div class="main-layout">
+  <app-navbar></app-navbar>
+  <app-dashboard></app-dashboard>
+</div>
+
 <app-filtrador></app-filtrador>
-<router-outlet />
+<router-outlet /> -->
+<!-- dashboard-layout.component.html -->
+<div class="dashboard-container">
+  <aside class="sidebar-left">
+    <app-navbar></app-navbar>
+  </aside>
+
+  <main class="dashboard-content">
+    <router-outlet></router-outlet>
+  </main>
+
+  <aside class="sidebar-right d-none d-md-block">
+    <!-- <app-filters></app-filters> -->
+  </aside>
+</div>
