@@ -5,8 +5,8 @@ import {
   INGESTION_QUEUE,
   IngestionJobName,
   IngestResourceJob,
-} from './ingestion.job';
-import { NexusSanitizer } from '../../common/utils/nexus.sanitizer';
+} from './ingestion-job';
+import { NexusSanitizer } from '../../common/utils/nexus';
 
 /**
  * NERVOUS SYSTEM — Ingestion Worker (Hardened)

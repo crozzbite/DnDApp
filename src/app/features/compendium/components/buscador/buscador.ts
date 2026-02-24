@@ -1,12 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { DndApiService } from '../../services/dnd/dnd-api.service';
+import { DndApiService } from '../../services/dnd/dnd-api';
 import { Component, inject } from '@angular/core';
 
 @Component({
   selector: 'app-buscador',
   imports: [CommonModule],
-  templateUrl: './buscador.component.html',
-  styleUrl: './buscador.component.scss',
+  templateUrl: './buscador.html',
+  styleUrl: './buscador.scss',
   standalone: true,
 })
 export class BuscadorComponent {

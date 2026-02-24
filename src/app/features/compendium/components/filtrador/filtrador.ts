@@ -1,13 +1,13 @@
 import { Component, inject } from '@angular/core';
-import { DndApiService } from '../../services/dnd/dnd-api.service';
+import { DndApiService } from '../../services/dnd/dnd-api';
 import { CommonModule } from '@angular/common';
-import { AppStateService } from '../../../../core/services/app-state/app-state.service';
+import { AppStateService } from '../../../../core/services/app-state/app';
 
 @Component({
   selector: 'app-filtrador',
   imports: [CommonModule],
-  templateUrl: './filtrador.component.html',
-  styleUrl: './filtrador.component.scss',
+  templateUrl: './filtrador.html',
+  styleUrl: './filtrador.scss',
   standalone: true,
 })
 export class FiltradorComponent {

@@ -1,10 +1,8 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { CompendiumController } from './api/compendium/compendium.controller';
-import {
-  IngestionWorker,
-  INGESTION_QUEUE,
-} from './workers/ingestion/ingestion.worker';
+import { CompendiumController } from './api/compendium/compendium';
+import { IngestionWorker } from './workers/ingestion/ingestion';
+import { INGESTION_QUEUE } from './workers/ingestion/ingestion-job';
 
 /**
  * Root Module — Nexus Gateway.

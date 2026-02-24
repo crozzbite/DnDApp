@@ -8,8 +8,8 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from '@fastify/helmet';
 import compress from '@fastify/compress';
 import { AppModule } from './app.module';
-import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { GlobalExceptionFilter } from './common/filters/global-exception';
+import { TransformInterceptor } from './common/interceptors/transform';
 
 const isProduction = process.env['NODE_ENV'] === 'production';
 const logger = new Logger('Bootstrap');

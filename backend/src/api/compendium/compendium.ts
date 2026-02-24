@@ -16,8 +16,8 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { SearchCompendiumDto } from '../../common/dto/search-compendium.dto';
-import { CompendiumCategory } from '../../common/enums/compendium.enum';
-import { NexusSanitizer } from '../../common/utils/nexus.sanitizer';
+import { CompendiumCategory } from '../../common/enums/compendium';
+import { NexusSanitizer } from '../../common/utils/nexus';
 
 /**
  * NERVOUS SYSTEM — Nexus Gateway Controller.

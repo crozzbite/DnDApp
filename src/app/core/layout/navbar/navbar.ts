@@ -1,12 +1,12 @@
 import { Component, effect, inject, signal } from '@angular/core';
-import { AppStateService } from '../../services/app-state/app-state.service';
-import { DndApiService } from '../../../features/compendium/services/dnd/dnd-api.service';
+import { AppStateService } from '../../services/app-state/app';
+import { DndApiService } from '../../../features/compendium/services/dnd/dnd-api';
 
 @Component({
   selector: 'app-navbar',
   imports: [],
-  templateUrl: './navbar.component.html',
-  styleUrl: './navbar.component.scss',
+  templateUrl: './navbar.html',
+  styleUrl: './navbar.scss',
   standalone: true,
 })
 export class NavbarComponent {
