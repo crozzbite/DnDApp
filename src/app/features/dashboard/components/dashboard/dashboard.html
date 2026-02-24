@@ -1,0 +1,15 @@
+<div class="filters-navar">
+  <p>dashboard works!</p>
+  @if (dnDService.dndclass()) {
+  <ul>
+    @for (item of dnDService.dndclass().results; track $index) {
+    <li>{{item.name}}</li>
+    @if(this.navarState.filterState() ==='spells' ){
+    <span>LVL- {{item.level}}</span>
+    <br>
+    }
+    <a [href]="item.url" target="_blank">go to link</a>
+    }
+  </ul>
+  }
+</div>

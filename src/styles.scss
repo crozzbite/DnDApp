@@ -7,3 +7,111 @@ $prefix: "mo-";
 
 // Then import Bootstrap
 @use "bootstrap/scss/bootstrap";
+
+:root {
+  --main-bg: #1a1a1a;
+  --main-red: #b71c1c;
+  --main-red-light: #e53935;
+  --main-red-dark: #7f0000;
+  --main-gray: #f5f5f5;
+}
+
+body, html {
+  background: var(--main-bg);
+  color: var(--main-gray);
+  min-height: 100vh;
+  margin: 0;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+h3 {
+  color: var(--main-red-light);
+  margin-bottom: 1rem;
+}
+
+.main-layout {
+  display: flex;
+  flex-direction: row;
+  min-height: 80vh;
+  gap: 2rem;
+}
+
+.left-navar {
+  min-width: 100px;
+  max-width: 120px;
+  background: var(--main-red-dark);
+  color: var(--main-gray);
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px #0008;
+  padding: 1.5rem 1rem 1rem 1rem;
+  margin: 1rem;
+  height: fit-content;
+}
+
+.nav-pills {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.nav-pills .nav-link {
+  color: var(--main-gray);
+  background: var(--main-red);
+  border-radius: 2rem;
+  margin: 0;
+  transition: background 0.2s;
+}
+
+.nav-pills .nav-link.active, .nav-pills .show>.nav-link {
+  background: var(--main-red-light);
+  color: #fff;
+}
+
+.dropdown-menu.custom {
+  background: var(--main-red);
+  color: var(--main-gray);
+  border-radius: 0.5rem;
+  min-width: 180px;
+  box-shadow: 0 2px 8px #0006;
+}
+
+.dropdown-item {
+  color: var(--main-gray);
+  transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+  background: var(--main-red-light);
+  color: #fff;
+}
+
+.dashboard {
+  flex: 1 1 0%;
+  background: #fff2f2;
+  color: #2d2d2d;
+  border-radius: 0.5rem;
+  margin-top: 1rem;
+  padding: .5rem;
+  min-width: 0;
+  width: 100%;
+  box-shadow: 0 2px 8px #0003;
+  display: flex;
+  flex-direction: column;
+}
+
+.filters-navar {
+  margin-bottom: 1.5rem;
+}
+
+ul {
+  padding-left: 1.2rem;
+}
+
+li {
+  margin-bottom: 0.5rem;
+}
+
+a {
+  color: var(--main-red-light);
+  text-decoration: underline;
+}

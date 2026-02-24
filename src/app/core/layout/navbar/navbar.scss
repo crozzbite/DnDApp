@@ -1,0 +1,11 @@
+.custom {
+  width: min-content;
+}
+.left-navar {
+  display: flex;
+  position: sticky;
+  border-inline-end: 1px solid;
+  color: chocolate;
+  top: 0;
+  width: 200vh;
+}
