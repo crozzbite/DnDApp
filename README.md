@@ -1,59 +1,42 @@
-# DnDApp
+# SkullRender Nexus: DnDApp
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.12.
+Bienvenido al sistema **Nexus**, una solución integral para el multiverso D&D bajo la arquitectura de **SkullRender**.
 
-## Development server
+## 🏗️ Estructura del Proyecto
 
-To start a local development server, run:
+El proyecto se divide en dos dominios principales siguiendo el principio de separación de preocupaciones:
 
-```bash
-ng serve
-```
+- **`/frontend`**: Capa de la Piel (Flesh). Aplicación Angular 19+ utilizando Signals y SSR.
+- **`/backend`**: Capa de la Armadura y Cerebro (Armor & Brain). API NestJS con workers de ingesta distribuida.
+- **`/openspec`**: Especificaciones técnicas y arquitectónicas del sistema.
+- **`/.agent`**: Capacidad cognitiva y habilidades de SkullRender.
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+---
 
-## Code scaffolding
+## 🚀 Inicio Rápido
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+### Frontend
 
 ```bash
-ng generate --help
+cd frontend
+npm install
+npm run start
 ```
 
-## Building
-
-To build the project run:
+### Backend
 
 ```bash
-ng build
+cd backend
+npm install
+npm run start:dev
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+---
 
-## Running unit tests
+## 🛡️ Estándares (The Skull Way)
 
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+- **Radical Naming**: Sin sufijos redundantes.
+- **OnPush**: Estrategia de detección de cambios obligatoria.
+- **Signals**: Gestión de estado reactiva nativa.
 
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+_Bones + Brain = Rational Creativity._

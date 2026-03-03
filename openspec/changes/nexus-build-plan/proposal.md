@@ -24,7 +24,7 @@ Se implementará el ecosistema completo del DnDApp en 7 fases incrementales:
 - `bones-domain`: Definición de interfaces base (`CompendiumResource`, `Monster`, `Spell`) y contratos de repositorio en `src/app/core/domain/`.
 - `brain-logic`: Implementación de casos de uso (`SearchCompendium`, `GetResourceDetail`) y el `DataLichOrchestrator` para priorización de fuentes.
 - `nervous-system-gateway`: Configuración de NestJS Fastify Gateway, BullMQ para Lich Workers e interceptores funcionales.
-- `organs-connectors`: Implementación de conectores externos (`Dnd5eApiConnector`, `Open5eConnector`) para la ingesta de datos.
+- `organs-connectors`: Implementación de conectores externos (`Dnd5eApiConnector`, `Open5eConnector`, `pdf-manuals-ingestor`) para la ingesta de datos.
 - `organs-persistence`: Configuración del `SQL Tome` (Prisma), `Cache Mantle` (Redis) y `Vector Nexus` (Pinecone).
 - `organs-defense`: Implementación de seguridad, rate limiting, Shadow Sessions y sanitización de I/O.
 - `flesh-ui`: Desarrollo de componentes Smart/Dumb en Angular 19, uso de Signals para estado global (`CompendiumStore`) y optimización con `@defer`.

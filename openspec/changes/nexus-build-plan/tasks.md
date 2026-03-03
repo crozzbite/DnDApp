@@ -39,17 +39,23 @@ Este documento desglosa las tareas necesarias para ejecutar el plan de construcc
 
 ### 4.1 Connectors & Inbound Immunity
 
-- [ ] 4.1.1 Implementar `Dnd5eApiConnector` con RxJS (retry, shareReplay).
-- [ ] 4.1.2 Implementar `Open5eConnector` y normalizadores correspondientes.
-- [ ] 4.1.3 Desarrollar adaptador para datos estáticos (Nick Aschenbach).
+- [x] 4.1.1 Implementar `Dnd5eApiConnector` con RxJS (retry, shareReplay).
+- [x] 4.1.2 Implementar `Open5eConnector` y normalizadores correspondientes.
+- [x] 4.1.3 Desarrollar adaptador para datos estáticos (Nick Aschenbach).
 - [x] 4.1.4 **Immune System (Payload Defense):** Configurar `bodyLimit` y validation pipes globales (Completado en Fase 3).
-- [ ] 4.1.5 Configurar sistema de manejo de errores `ConnectorError`.
+- [x] 4.1.5 Configurar sistema de manejo de errores `ConnectorError`.
+- [x] 4.1.6 Implementar `pdf-manuals-ingestor` y cargar `index.json` de grimorios. (Asset Nexus Preparado).
+- [x] 4.1.7 Crear `AssetResolverService` en el Core para desacoplamiento de URLs (Local vs CDN).
+- [x] 4.1.8 Implementar `CompendiumRepositoryImpl` (Infrastructure Implementation) para orquestar los conectores (SRD, Open5e, Manuals).
 
 ### 4.2 Defense & Session Shield (Asynchronous Security)
 
-- [ ] 4.2.1 Implementar `AdminLichGuard` con validación HMAC para endpoints de ingesta.
-- [ ] 4.2.2 Configurar `ShadowSessionMiddleware` para cookies seguras y HttpOnly.
-- [ ] 4.2.3 Implementar interceptores de seguridad en Angular (CSRF, Auth Headers).
+- [ ] 4.2.0 Implementar `BrowserSessionRepository` (Infraestructura) para persistencia de Shadow Sessions.
+- [ ] 4.2.1 Desarrollar `AuthCryptService` usando Web Crypto API para firmas HMAC-SHA256.
+- [ ] 4.2.2 Integrar `AuthCryptService` en `BaseOracleConnector` para firmar peticiones salientes.
+- [ ] 4.2.3 Implementar `AdminLichGuard` con validación HMAC para endpoints de ingesta.
+- [ ] 4.2.4 Configurar `ShadowSessionMiddleware` en el backend para cookies seguras y HttpOnly.
+- [ ] 4.2.5 Implementar interceptores de seguridad en Angular para manejo global de CSRF/Auth.
 
 ### 4.3 Persistence & Data Sanctum
 
@@ -58,11 +64,11 @@ Este documento desglosa las tareas necesarias para ejecutar el plan de construcc
 - [ ] 4.3.3 Configurar Redis para el `CacheMantle`.
 - [ ] 4.3.4 Integrar Pinecone para el `VectorNexus`.
 
-### 4.4 External Asset Nexus (Storage)
+## 4.4 External Asset Nexus (Storage) - [CULMINACIÓN DE PDF-INGESTOR]
 
 - [ ] 4.4.1 Configurar Bucket externo (Cloudflare R2 / S3) para archivos pesados (2GB+).
-- [ ] 4.4.2 Implementar script de migración para mover assets de `src/assets/docs` al Nexus.
-- [ ] 4.4.3 Actualizar `pdfUrl` en los modelos para apuntar al CDN externo.
+- [ ] 4.4.2 Implementar script de migración (`nexus-sync.ts`) para mover assets de `src/assets/docs` al Nexus.
+- [ ] 4.4.3 Actualizar `pdfUrl` en los modelos y normalizadores para apuntar al CDN externo (Vinculado a Spec 4.1).
 
 ## 5. Fase 5: Flesh (UI/UX)
 

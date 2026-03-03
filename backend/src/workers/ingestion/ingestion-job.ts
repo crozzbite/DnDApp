@@ -1,4 +1,4 @@
-import { CompendiumCategory } from '../../common/enums/compendium.enum';
+import { CompendiumCategory } from '../../common/enums/compendium';
 
 /**
  * Nombre de la cola de ingesta
