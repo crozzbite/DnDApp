@@ -21,7 +21,7 @@ import { NexusSanitizer } from '../../common/utils/nexus';
 export class IngestionWorker extends WorkerHost {
   private readonly logger = new Logger(IngestionWorker.name);
 
-  async process(job: Job<any>): Promise<void> {
+  async process(job: Job): Promise<void> {
     const jobName = job.name as IngestionJobName;
 
     this.logger.log({

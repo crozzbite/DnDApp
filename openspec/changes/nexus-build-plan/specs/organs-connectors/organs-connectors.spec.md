@@ -23,9 +23,43 @@ src/app/core/infrastructure/connectors/
 │   └── open5e.normalizer.ts
 ├── static/             # Adaptador para JSONs locales (Nick Aschenbach)
 │   └── local-data.adapter.ts
+├── pdf-ingestor/       # Ingestor para PDFs locales
+│   ├── pdf-manuals.connector.ts
+│   ├── pdf-manuals.normalizer.ts
+│   └── pdf-manuals.index-loader.ts
 └── common/             # Utilidades de red compartidas
     └── connector.error.ts
 ```
+
+## 3. pdf-manuals-ingestor Spec (External Asset Nexus Integration)
+
+Este conector evoluciona de una carga local a una integración con el **External Asset Nexus** (Cloudflare R2 / S3), permitiendo manejar los +2.6GB de grimorios sin saturar el repositorio.
+
+### Requirement: Indexación Híbrida de Grimorios
+
+El sistema DEBE ser capaz de leer el `index.json` y resolver las rutas de los archivos de forma dinámica, priorizando el CDN externo sobre los assets locales.
+
+#### Scenario: Resolución de URL (Assets Nexus)
+
+- **WHEN** el entorno es `production` o el flag `useExternalNexus` es `true`.
+- **THEN** el `pdf-manuals.normalizer.ts` debe transformar las rutas relativas en URLs de CDN (ej. `https://nexus.skullrender.com/dnd-manuals/...`).
+
+### Requirement: Ingesta y Sincronización (Task 4.4.2)
+
+Se debe implementar un script de migración (`nexus-sync.ts`) que automatice la subida de los archivos desde `src/assets/docs/` hacia el Bucket externo, manteniendo la integridad referencial del `index.json`.
+
+### Requirement: Configuración de Almacenamiento (Task 4.4.1)
+
+El conector debe utilizar las credenciales del Vault para interactuar con la API de S3/R2 en tiempo de build o mediante prefijos de URL firmadas si se requiere acceso privado.
+
+#### Scenario: Fallback a Local
+
+- **WHEN** el asset no está disponible en el Nexus o estamos en `development` sin conexión.
+- **THEN** el ingestor debe buscar el archivo en la ruta local de `assets/docs/` como fallback de emergencia.
+
+### Requirement: Desacoplamiento via AssetResolver (Task 4.1.7)
+
+Se DEBE utilizar el `AssetResolverService` para abstraer la construcción de las URLs finales. Ningún componente o conector debe manipular strings de rutas directamente.
 
 ## 3. Framework & Stack
 

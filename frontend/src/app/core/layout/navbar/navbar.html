@@ -1,0 +1,25 @@
+<nav class="left-navar">
+  <ul class="nav nav-pills flex-column nav-fill">
+    <li class="nav-item">
+      <button class="nav-link dropdown-toggle btn w-100 text-start" (click)="toggleDropdown()" type="button">
+        menu
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link dropdown-toggle btn w-100 text-start" (click)="toggleDropdown()" type="button">
+        filtro
+      </button>
+    </li>
+  </ul>
+  @if (isOpen()) {
+  <ul class="dropdown-menu show position-static mt-2 custom">
+    @for (item of stateList; track item) {
+    <li>
+      <button class="dropdown-item" (click)="ChangeState(item)" type="button">
+        {{ item }}
+      </button>
+    </li>
+    }
+  </ul>
+  }
+</nav>

@@ -1,55 +1,42 @@
-# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# SkullRender Nexus Master Ignore
+# ===============================
 
-# Compiled output
-/dist
-/tmp
-/out-tsc
-/bazel-out
-
-# Node
-/node_modules
-npm-debug.log
-yarn-error.log
-
-# IDEs and editors
+# Global Node & IDE
+node_modules/
+.vscode/
 .idea/
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
-
-# Visual Studio Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-.history/*
-
-# Miscellaneous
-/.angular/cache
-.sass-cache/
-/connect.lock
-/coverage
-/libpeerconnection.log
-testem.log
-/typings
-
-# System files
 .DS_Store
 Thumbs.db
+*.log
+.env
 
-# SkullRender Assets (Large binaries)
-/src/assets/docs/
-*.pdf
-
-# Backend
+# Layer: Armor (Backend)
 /backend/node_modules/
 /backend/dist/
-.env
+/backend/bun.lockb
+
+# Layer: Flesh (Frontend)
+/frontend/node_modules/
+/frontend/dist/
+/frontend/out-tsc
+/frontend/bazel-out
+/frontend/.angular/
+/frontend/bun.lockb
+
+# Root / Legacy compatibility
+/dist/
+/tmp/
+/node_modules/
+/.angular/
+
+# SkullRender Assets (Large binaries)
+/frontend/src/assets/docs/
+*.pdf
 
 # AI & Workflow Tools
 .gemini/
+.agent/
 .agente/
+openspec/
+!/.agent/
+!/openspec/

@@ -63,8 +63,18 @@ Cada caso de uso DEBE incluir guardias de seguridad lógica, como la detección 
 - **WHEN** el usuario ingresa una query
 - **THEN** el sistema debe filtrar información sensible antes de enviarla al Vector Nexus.
 
+### Requirement: Resolución de Assets (Nexus Bridge)
+
+El sistema DEBE desacoplar la ubicación física de los archivos de su consumo en la UI. El `DataLichOrchestrator` debe actuar como el mediador final usando el `AssetResolver`.
+
+#### Scenario: Resolución de PDF Externo
+
+- **WHEN** un recurso tiene un `pdfUrl`.
+- **THEN** el orquestador debe devolver el recurso con la URL ya resuelta para el cliente (CDN o Local).
+
 ## 6. Valor Añadido (Design Patterns)
 
 - **Orchestration Layer:** Separa la complejidad de la red y la persistencia de la vista.
 - **Dependency Injection:** Permite mockear los repositorios y oráculos fácilmente en el Gauntlet (Fase 6).
+- **Bridge Pattern (AssetResolver):** Desacopla la lógica de negocio de la infraestructura de almacenamiento (Local vs Cloudflare R2).
 - **Single Responsibility Principle (SRP):** Cada clase de `UseCase` solo tiene un método público `execute()`.
