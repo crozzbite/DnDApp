@@ -16,7 +16,18 @@
 
 ### 4. Caché de Armor con TTL (Memory Safety)
 
-(Existente...)
+- **Decisión:** Implementar TTL (Time-to-Live) de 5 minutos en `Open5eConnector` y `Dnd5eApiConnector`.
+- **Razón:** Prevenir memory leaks en la SPA y asegurar frescura de datos sin impactar el rate limit de las APIs externas.
+- **Implementación:** `shareReplay({ bufferSize: 1, refCount: true })` para limpieza automática de observables sin suscriptores.
+
+### 5. Identidades Determinísticas (Bones Consistency)
+
+- **Decisión:** Sustituir `crypto.randomUUID()` por IDs prefijados basados en el slug/index (`open5e-monster-slug`).
+- **Razón:** Permitir deduplicación, comparaciones estables y persistencia coherente entre sesiones de usuario.
+
+### 1. Estrategia de Fallback "Tri-Source"
+
+... (contenido previo)
 
 ---
 
