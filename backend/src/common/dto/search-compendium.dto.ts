@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { CompendiumCategory, CompendiumSource } from '../enums/compendium.enum';
+import { CompendiumCategory, CompendiumSource } from '../enums/compendium';
 
 /**
  * NERVOUS SYSTEM — DTO for Compendium Search.

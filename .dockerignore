@@ -1,0 +1,8 @@
+**/node_modules
+**/.git
+**/dist
+**/coverage
+**/.angular
+frontend/bun.lock
+**/*.md
+!deploy/README.md
