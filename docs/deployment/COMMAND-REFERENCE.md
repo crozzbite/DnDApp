@@ -794,6 +794,271 @@ docker push ghcr.io/crozzbite/dndapp-web:$sha
 
 ---
 
+## 17. Phase 3 — Azure AKS
+
+**Goal:** one AKS cluster, **five namespaces** (`dnd-dev` … `dnd-prod`), NGINX Ingress (HTTP). Same GHCR digest promoted everywhere; only ConfigMaps differ per environment.
+
+**Session constants** (reuse in every Phase 3 terminal):
+
+```powershell
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+$RG = "rg-dndapp-learn"
+$LOC = "eastus"
+$CLUSTER = "aks-dndapp"
+```
+
+**Kustomize layout (DRY — 2026-06-22):**
+
+```text
+deploy/k8s/
+  base/                         # Deployments, Services, Ingress, Redis (shared)
+  config/environments.json      # namespace, ingressHost, frontendUrl per env
+  scripts/Build-Overlay.ps1     # generates .generated/<env>/ (gitignored)
+  overlays/README.md            # usage docs (no duplicated YAML trees)
+```
+
+**Deploy one or all environments:**
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
+
+# Preview (no apply)
+.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment dev
+
+# Apply one env
+.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment dev -Apply
+
+# Apply all five
+.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment all -Apply
+```
+
+### 17a. Preflight Azure
+
+```powershell
+# Install (once) — winget on Windows
+winget install Microsoft.AzureCLI --accept-package-agreements --accept-source-agreements
+
+# Refresh PATH in current PowerShell if az not found
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+az version
+az login                    # browser — free trial / subscription with credits
+az account show -o table
+az account list -o table    # if wrong sub: az account set --subscription "<id>"
+
+# First-time subscription: register AKS provider (wait until Registered)
+az provider register --namespace Microsoft.ContainerService
+az provider show -n Microsoft.ContainerService --query registrationState -o tsv
+
+# Context hygiene — kind local vs AKS cloud
+kubectl config get-contexts
+kubectl config current-context
+```
+
+| Context | Cluster | Use for |
+|---------|---------|---------|
+| `kind-dnd-dev` | kind on Docker Desktop | Phase 1–2 local practice |
+| `aks-dndapp` | Azure AKS | Phase 3 cloud |
+
+**Switch context explicitly before every apply:**
+
+```powershell
+kubectl config use-context aks-dndapp    # cloud
+kubectl config use-context kind-dnd-dev  # local kind
+```
+
+**Optional:** when only using AKS, free local RAM — `kind delete cluster --name dnd-dev` (does not affect Azure).
+
+### 17b. Create AKS cluster
+
+**Cost note:** nodes + Load Balancer bill while `powerState` is `Running`. Use §17g to stop when idle.
+
+**VM size (free trial gotcha):** `Standard_B2s` is often `NotAvailableForSubscription` in `eastus`. Use **`Standard_D2s_v7`** (2 vCPU, 8 GB). Always pass `--node-vm-size` explicitly — omitting it may default to a SKU your trial blocks.
+
+```powershell
+$RG = "rg-dndapp-learn"
+$LOC = "eastus"
+$CLUSTER = "aks-dndapp"
+
+az group create --name $RG --location $LOC
+
+# Verify RG exists (skip create if already there)
+az group show --name $RG -o table
+
+az aks create `
+  --resource-group $RG `
+  --name $CLUSTER `
+  --node-count 1 `
+  --node-vm-size Standard_D2s_v7 `
+  --generate-ssh-keys `
+  --enable-managed-identity
+
+az aks get-credentials --resource-group $RG --name $CLUSTER --overwrite-existing
+kubectl config current-context
+kubectl get nodes
+```
+
+**Expected:** context `aks-dndapp`, one node `Ready`, K8s ~1.34.x.
+
+**Spot nodes (optional, testing only):** `--priority Spot` is **not** valid on `az aks create`. `--node-count 0` fails on the default **system** pool on free trial. To use Spot later: create a regular cluster first, then `az aks nodepool add ... --priority Spot` (see Azure docs). Not recommended for live D&D sessions (eviction risk).
+
+### 17c. NGINX Ingress Controller
+
+AKS does not ship Ingress by default. Install the community controller (once per cluster):
+
+```powershell
+kubectl config current-context   # must be aks-dndapp
+
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
+
+kubectl wait --namespace ingress-nginx `
+  --for=condition=ready pod `
+  --selector=app.kubernetes.io/component=controller `
+  --timeout=180s
+
+kubectl get svc -n ingress-nginx ingress-nginx-controller
+```
+
+Note **EXTERNAL-IP** (may take 2–5 min on Azure LB). All namespace Ingresses share this IP; routing uses **Host** header (`dnd-dev.local`, etc.).
+
+### 17d. GHCR pull secret (all namespaces)
+
+The `ghcr-pull` secret from kind **does not transfer** to AKS. Create in each namespace:
+
+```powershell
+$namespaces = @("dnd-dev", "dnd-test", "dnd-qa", "dnd-stage", "dnd-prod")
+
+foreach ($ns in $namespaces) {
+  kubectl create namespace $ns --dry-run=client -o yaml | kubectl apply -f -
+  kubectl create secret docker-registry ghcr-pull `
+    --docker-server=ghcr.io `
+    --docker-username=crozzbite `
+    --docker-password="$(gh auth token)" `
+    -n $ns `
+    --dry-run=client -o yaml | kubectl apply -f -
+}
+```
+
+> 🚨 Cerbero: PowerShell requires `"$(gh auth token)"` — bare `(gh auth token)` splits into two kubectl args.
+
+### 17e. Deploy overlays
+
+Create `ghcr-pull` **before** or right after first namespace (see §17d). Then:
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
+
+kubectl config current-context   # aks-dndapp
+
+# First environment (validated 2026-06-22)
+.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment dev -Apply
+
+# Remaining four (Phase 3 exit criteria)
+.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment all -Apply
+
+# Verify rollouts
+kubectl rollout status deployment/api -n dnd-dev
+kubectl rollout status deployment/web -n dnd-dev
+kubectl get pods -n dnd-dev
+kubectl get ingress -n dnd-dev -o wide
+```
+
+**Verify same digest across namespaces:**
+
+```powershell
+kubectl get deploy -A -l app.kubernetes.io/part-of=dndapp `
+  -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image'
+```
+
+**Expected:** api + web in all five namespaces reference the same `@sha256:...` digests from Phase 2.
+
+### 17f. Ingress smoke test
+
+Without a custom domain, use the Ingress **EXTERNAL-IP** + **hosts file** entries:
+
+```powershell
+$ip = kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+Write-Host "EXTERNAL-IP: $ip"
+```
+
+Add to `C:\Windows\System32\drivers\etc\hosts` (**Administrator** Notepad — a `# comment` in PowerShell does **not** edit this file):
+
+```powershell
+# Run PowerShell as Administrator, then:
+notepad C:\Windows\System32\drivers\etc\hosts
+```
+
+Append one line (replace IP with your EXTERNAL-IP from §17c):
+
+```text
+52.149.204.135  dnd-dev.local dnd-test.local dnd-qa.local dnd-stage.local dnd-prod.local
+```
+
+Smoke:
+
+```powershell
+curl.exe http://dnd-dev.local/health
+curl.exe -I http://dnd-dev.local/
+```
+
+**Expected:** `{"status":"ok",...}` and `HTTP/1.1 200 OK`. `Could not resolve host` → hosts file not saved or missing admin edit.
+
+**Fallback (no Ingress yet):** port-forward works identically to Phase 1–2:
+
+```powershell
+kubectl port-forward -n dnd-dev svc/api 3000:3000
+kubectl port-forward -n dnd-dev svc/web 4200:4000
+```
+
+**TLS / HTTPS:** deferred until custom domain exists → cert-manager + Let's Encrypt in Phase 4+.
+
+### 17g. Cost control (stop/start)
+
+**Option A — stop entire cluster** (fastest cost cut; API unavailable):
+
+```powershell
+az aks stop --resource-group $RG --name $CLUSTER
+
+# Verify stopped (PowerState = Stopped; kubectl cannot connect)
+az aks show -g $RG -n $CLUSTER --query powerState.code -o tsv
+kubectl get nodes   # expected: Unable to connect to the server
+
+# Resume next session:
+az aks start --resource-group $RG --name $CLUSTER
+az aks show -g $RG -n $CLUSTER --query powerState.code -o tsv   # Running
+kubectl get nodes                                               # Ready
+```
+
+**Option B — scale node pool to zero** (cluster API stays; no workload nodes):
+
+```powershell
+az aks nodepool scale --resource-group $RG --cluster-name $CLUSTER --name nodepool1 --node-count 0
+# Scale back up:
+az aks nodepool scale --resource-group $RG --cluster-name $CLUSTER --name nodepool1 --node-count 1
+```
+
+**Always stop when not practicing.** kind local remains free for day-to-day dev.
+
+### 17h. Troubleshoot
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `az: command not found` | PATH not refreshed | §17a PATH refresh or new terminal |
+| `No subscriptions found` | Azure account without subscription | Sign up at azure.microsoft.com/free, then `az login` |
+| `MissingSubscriptionRegistration` | AKS provider not registered | §17a `az provider register --namespace Microsoft.ContainerService` |
+| `Standard_B2s` / `Standard_D4d_v5` not allowed | free trial SKU restrictions | §17b use `Standard_D2s_v7`; always set `--node-vm-size` |
+| `agentPoolProfile.count was 0` | system pool requires ≥1 node | cannot use `--node-count 0` on create for Camino Spot |
+| `--priority Spot` on `az aks create` | flags only on `nodepool add` | §17b note; create regular cluster first |
+| `Could not resolve host: dnd-dev.local` | hosts file not edited | §17f admin Notepad, not PowerShell `#` comment |
+| `ImagePullBackOff` on AKS | no `ghcr-pull` in namespace | §17d |
+| Ingress `404` / no address | controller not ready / no EXTERNAL-IP | §17c wait + `kubectl get svc -n ingress-nginx` |
+| Wrong cluster updated | context mix-up kind vs AKS | `kubectl config current-context` before apply |
+| CORS errors from API | `FRONTEND_URL` mismatch | edit `deploy/k8s/config/environments.json` + re-run Build-Overlay |
+| `az aks create` quota error | subscription limits | try another region or smaller VM |
+
+---
+
 ## Cheat sheet — flags at a glance
 
 | Flag / pattern | Tool | Meaning |
@@ -813,6 +1078,11 @@ docker push ghcr.io/crozzbite/dndapp-web:$sha
 | `ghcr.io/<owner>/<name>:<tag>` | docker | Full registry image address |
 | `docker login ghcr.io` | docker | Authenticate to GHCR before push/pull |
 | `imagePullSecrets` | Deployment | Credentials to pull a private registry image |
+| `apply -k` | kubectl | Apply Kustomize overlay directory |
+| `Build-Overlay.ps1 -Environment` | PowerShell | Generate `.generated/<env>/` from `environments.json` |
+| `az provider register` | Azure CLI | Enable AKS on new subscriptions |
+| `az aks stop/start` | Azure CLI | Cost control — pause/resume AKS cluster |
+| `Standard_D2s_v7` | AKS | Trial-friendly node VM size (eastus) |
 
 ---
 

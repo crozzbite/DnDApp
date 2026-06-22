@@ -1,0 +1,29 @@
+{
+  "environments": {
+    "dev": {
+      "namespace": "dnd-dev",
+      "ingressHost": "dnd-dev.local",
+      "frontendUrl": "http://dnd-dev.local"
+    },
+    "test": {
+      "namespace": "dnd-test",
+      "ingressHost": "dnd-test.local",
+      "frontendUrl": "http://dnd-test.local"
+    },
+    "qa": {
+      "namespace": "dnd-qa",
+      "ingressHost": "dnd-qa.local",
+      "frontendUrl": "http://dnd-qa.local"
+    },
+    "stage": {
+      "namespace": "dnd-stage",
+      "ingressHost": "dnd-stage.local",
+      "frontendUrl": "http://dnd-stage.local"
+    },
+    "prod": {
+      "namespace": "dnd-prod",
+      "ingressHost": "dnd-prod.local",
+      "frontendUrl": "https://dnd-5e-saas.vercel.app"
+    }
+  }
+}
