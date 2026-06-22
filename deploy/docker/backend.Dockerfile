@@ -10,6 +10,7 @@ COPY backend/ ./
 RUN bun run build
 
 FROM node:22-alpine AS run
+LABEL org.opencontainers.image.source=https://github.com/crozzbite/DnDApp
 WORKDIR /app/backend
 
 ENV NODE_ENV=production

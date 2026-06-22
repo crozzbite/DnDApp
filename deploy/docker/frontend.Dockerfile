@@ -10,6 +10,7 @@ COPY frontend/ ./
 RUN npm run build
 
 FROM node:22-alpine AS run
+LABEL org.opencontainers.image.source=https://github.com/crozzbite/DnDApp
 WORKDIR /app/frontend
 
 ENV NODE_ENV=production

@@ -32,6 +32,9 @@ cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
 | Web build + load + deploy | 1 | [§14](#14-phase-1--web-frontend) |
 | Full stack smoke test | 1 | [§11](#11-phase-1--verify-and-access) |
 | Full teardown | 1 | [§15](#15-full-teardown-phase-1-session-end) |
+| GHCR auth + build + push | 2 | [§16](#16-phase-2--ghcr-registry) |
+| Deploy by GHCR tag | 2 | [§16](#16-phase-2--ghcr-registry) |
+| Link package to repo (OCI label) | 2 / 4 | [§16h](#16h-link-ghcr-package-to-repo-oci-label--rebuild) |
 
 ---
 
@@ -653,6 +656,144 @@ Recreate from scratch: §7 → §8 → §9 → §10 → §14.
 
 ---
 
+## 16. Phase 2 — GHCR (registry)
+
+**Goal:** stop using `kind load` (local-only) and instead **push images to GitHub Container Registry (GHCR)**, then deploy by an **immutable git-SHA tag**. This is how a remote cluster (AKS) pulls images.
+
+**Image naming:** `ghcr.io/<owner>/<name>:<tag>` → e.g. `ghcr.io/crozzbite/dndapp-api:28a836e`.
+
+### 16a. Auth preflight (per token)
+
+GHCR push needs a token with the `write:packages` scope.
+
+```powershell
+# Add packages scopes to the gh token (opens browser device flow)
+gh auth refresh -h github.com -s write:packages,read:packages
+gh auth status   # confirm scopes include write:packages
+
+# Log Docker into GHCR using the gh token (no password stored on disk)
+gh auth token | docker login ghcr.io -u crozzbite --password-stdin
+```
+
+**Expected:** `Login Succeeded`.
+
+### 16b. Build images tagged for GHCR
+
+```powershell
+$sha = git rev-parse --short HEAD   # must be a CLEAN working tree, else the tag lies
+
+docker build -f deploy\docker\backend.Dockerfile  -t ghcr.io/crozzbite/dndapp-api:$sha .
+docker build -f deploy\docker\frontend.Dockerfile -t ghcr.io/crozzbite/dndapp-web:$sha .
+
+docker images | Select-String "ghcr.io/crozzbite"
+```
+
+| Part | Meaning |
+|------|---------|
+| `-f ...Dockerfile` | which recipe (Dockerfile) to build |
+| `-t ghcr.io/crozzbite/<name>:$sha` | full registry address + version tag |
+| `.` | build context = repo root (filtered by `.dockerignore`) |
+
+**Why the SHA:** ties each image to the exact commit → traceable + rollback-able. Commit first.
+
+### 16c. Push to GHCR
+
+```powershell
+docker push ghcr.io/crozzbite/dndapp-api:$sha
+docker push ghcr.io/crozzbite/dndapp-web:$sha
+```
+
+**Expected:** layers uploaded + a `digest: sha256:...` line. Note the digest — deploy-by-digest is the most immutable reference.
+
+### 16d. Point manifests at GHCR
+
+In `deploy/k8s/base/api-deployment.yaml` and `web-deployment.yaml`:
+
+```yaml
+# before (Phase 1 — local image loaded onto the node)
+image: dndapp-api:local
+imagePullPolicy: IfNotPresent
+# after (Phase 2 — pull from GHCR by immutable SHA tag)
+image: ghcr.io/crozzbite/dndapp-api:28a836e
+imagePullPolicy: IfNotPresent
+```
+
+### 16e. Redeploy + verify
+
+```powershell
+kubectl apply -f deploy\k8s\base\api-deployment.yaml
+kubectl apply -f deploy\k8s\base\web-deployment.yaml
+kubectl rollout status deployment/api -n dnd-dev
+kubectl rollout status deployment/web -n dnd-dev
+kubectl get pods -n dnd-dev
+```
+
+### 16f. Private package → cluster needs a pull secret
+
+New GHCR packages are **private by default** (keep them private). A cluster then needs credentials to pull:
+
+```powershell
+kubectl create secret docker-registry ghcr-pull --docker-server=ghcr.io --docker-username=crozzbite --docker-password="$(gh auth token)" -n dnd-dev
+# PowerShell: use "$(gh auth token)" — bare (gh auth token) splits into two kubectl NAME args
+# then add to the Deployment spec:  imagePullSecrets: [{ name: ghcr-pull }]
+```
+
+> 🚨 Cerbero: keep packages private; never bake secrets into image layers (`.dockerignore` excludes `.git`, `.env*`). A package made public is reachable from the open internet.
+
+### 16g. Troubleshoot
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `denied: ... write:packages` | token missing scope | §16a `gh auth refresh -s write:packages` |
+| `unauthorized` on push | not logged into ghcr.io | §16a `docker login ghcr.io` |
+| pod `ImagePullBackOff` | private package, no pull secret | §16f create `ghcr-pull` secret |
+| `manifest unknown` on pull | tag never pushed / typo | re-check tag, `docker push` again |
+
+### 16h. Link GHCR package to repo (OCI label + rebuild)
+
+**When:** After a manual `docker push`, packages may not appear under the repo sidebar until linked. You can link once via GitHub UI (**Package → Connect repository → `crozzbite/DnDApp`**), or automate future pushes with an OCI label in the Dockerfile (recommended for Phase 4 CI).
+
+**Already in repo:** both `deploy/docker/backend.Dockerfile` and `frontend.Dockerfile` include:
+
+```dockerfile
+LABEL org.opencontainers.image.source=https://github.com/crozzbite/DnDApp
+```
+
+(on the final `run` stage — the image that gets pushed)
+
+**What it does:** GitHub reads this annotation on `docker push` and associates the container package with the repo. No K8s YAML involved — this is GitHub Packages metadata.
+
+**Deferred rebuild (do at next image publish — Phase 4 CI or manual):**
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
+
+# 1. Commit Dockerfile LABEL change first (if not already committed)
+git add deploy/docker/backend.Dockerfile deploy/docker/frontend.Dockerfile
+git commit -m "chore(deploy): add OCI source label for GHCR repo linking"
+
+# 2. Build + tag with new git SHA
+$sha = git rev-parse --short HEAD
+docker build -f deploy\docker\backend.Dockerfile  -t ghcr.io/crozzbite/dndapp-api:$sha .
+docker build -f deploy\docker\frontend.Dockerfile -t ghcr.io/crozzbite/dndapp-web:$sha .
+
+# 3. Verify label embedded (optional)
+docker inspect ghcr.io/crozzbite/dndapp-api:$sha --format "{{index .Config.Labels \"org.opencontainers.image.source\"}}"
+# Expected: https://github.com/crozzbite/DnDApp
+
+# 4. Push — GHCR auto-links (or reinforces UI link)
+docker push ghcr.io/crozzbite/dndapp-api:$sha
+docker push ghcr.io/crozzbite/dndapp-web:$sha
+```
+
+**Phase 2 note (2026-06-21):** packages were linked manually via UI for images tagged `28a836e` (pushed before LABEL existed). No rebuild required for that link. Next build with LABEL keeps linking automatic without UI.
+
+**Phase 4 note:** GitHub Actions push with `GITHUB_TOKEN` from `crozzbite/DnDApp` also auto-links; the LABEL is belt-and-suspenders for manual pushes and supply-chain traceability.
+
+> 🚨 Cerbero: the label is a public URL in the image manifest (not a secret). Keep packages **Private** regardless of repo link.
+
+---
+
 ## Cheat sheet — flags at a glance
 
 | Flag / pattern | Tool | Meaning |
@@ -668,6 +809,10 @@ Recreate from scratch: §7 → §8 → §9 → §10 → §14.
 | `IfNotPresent` | Deployment | Use local image on node |
 | `tcpSocket` | Deployment probe | Check port open without HTTP (Angular SSR web) |
 | `port-forward` | kubectl | Local access to cluster Service |
+| `docker push` | docker | Upload an image to a registry (GHCR) |
+| `ghcr.io/<owner>/<name>:<tag>` | docker | Full registry image address |
+| `docker login ghcr.io` | docker | Authenticate to GHCR before push/pull |
+| `imagePullSecrets` | Deployment | Credentials to pull a private registry image |
 
 ---
 

@@ -17,10 +17,12 @@ spec:
       labels:
         app.kubernetes.io/name: web
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: web
-          image: dndapp-web:local
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/crozzbite/dndapp-web@sha256:b4733fe5cca586a465289d1d436f95af74c72384c5ba804812a9db5a59a849d8  # Phase 2: GHCR pinned by digest (immutable, tamper-evident)
+          imagePullPolicy: Always
           ports:
             - containerPort: 4000
               name: http

@@ -18,10 +18,12 @@ spec:
       labels:
         app.kubernetes.io/name: api   # Must match selector.matchLabels
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull           # Credentials to pull the private GHCR package
       containers:
         - name: api
-          image: dndapp-api:local     # Local image (Phase 1); GHCR tag in Phase 2
-          imagePullPolicy: IfNotPresent  # Use image on kind node; skip Docker Hub pull
+          image: ghcr.io/crozzbite/dndapp-api@sha256:09bc071032f9c861903e9e945cdca5f5e6c0dc6dc69dd0c60c0ce7e21b507978  # Phase 2: GHCR pinned by digest (immutable, tamper-evident)
+          imagePullPolicy: Always        # Phase 2: force pull from GHCR (validates registry round-trip)
           ports:
             - containerPort: 3000       # Port the NestJS process listens on inside the pod
               name: http
