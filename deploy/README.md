@@ -3,7 +3,9 @@
 Infrastructure and runtime artifacts for DnDApp (Docker → Kubernetes → Azure).
 
 **Start here:** [docs/deployment/DEPLOYMENT-MASTER-PLAN.md](../docs/deployment/DEPLOYMENT-MASTER-PLAN.md)  
-**Tomorrow (Phase 0):** [docs/deployment/phase-0-checklist.md](../docs/deployment/phase-0-checklist.md)
+**Command cheat sheet:** [docs/deployment/COMMAND-REFERENCE.md](../docs/deployment/COMMAND-REFERENCE.md)  
+**Phase 0 (done):** [docs/deployment/phase-0-checklist.md](../docs/deployment/phase-0-checklist.md)  
+**Phase 1 (active):** [docs/deployment/phase-1-checklist.md](../docs/deployment/phase-1-checklist.md)
 
 ## Planned layout
 

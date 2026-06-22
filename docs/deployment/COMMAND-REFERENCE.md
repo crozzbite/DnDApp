@@ -1,0 +1,674 @@
+# DnDApp — Deployment command reference
+
+**Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
+**Purpose:** Copy-paste workflows for manual deploy, verify, rollback, and troubleshoot.  
+**Shell:** PowerShell on Windows — chain with `;` (not `&&`).
+
+All paths assume repo root:
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
+```
+
+---
+
+## Quick index
+
+| Workflow | Phase | Section |
+|----------|-------|---------|
+| Tool preflight | 0–1 | [§1](#1-preflight-tools) |
+| Compose up / down | 0 | [§2](#2-phase-0--compose-lifecycle) |
+| Build images (compose) | 0 | [§3](#3-phase-0--build-images) |
+| Smoke tests (compose) | 0 | [§4](#4-phase-0--smoke-tests) |
+| Rollback drill (compose) | 0 | [§5](#5-phase-0--rollback-drill) |
+| Compose troubleshoot | 0 | [§6](#6-phase-0--troubleshoot) |
+| kind cluster lifecycle | 1 | [§7](#7-phase-1--kind-cluster) |
+| Namespace | 1 | [§8](#8-phase-1--namespace) |
+| Redis (K8s) | 1 | [§9](#9-phase-1--redis) |
+| API build + load + deploy | 1 | [§10](#10-phase-1--api) |
+| Verify + port-forward (K8s) | 1 | [§11](#11-phase-1--verify-and-access) |
+| Rollback (K8s) | 1 | [§12](#12-phase-1--rollback) |
+| K8s troubleshoot | 1 | [§13](#13-phase-1--troubleshoot) |
+| Web build + load + deploy | 1 | [§14](#14-phase-1--web-frontend) |
+| Full stack smoke test | 1 | [§11](#11-phase-1--verify-and-access) |
+| Full teardown | 1 | [§15](#15-full-teardown-phase-1-session-end) |
+
+---
+
+## 1. Preflight (tools)
+
+```powershell
+# Docker running?
+docker info --format "{{.ServerVersion}}"
+
+# kubectl client (server line appears after cluster exists)
+kubectl version --client
+
+# kind installed?
+kind version
+
+# Git context (optional)
+git branch --show-current
+git rev-parse --short HEAD
+```
+
+**Install kind (if missing):**
+
+```powershell
+winget install Kubernetes.kind
+# Close and reopen terminal, then:
+kind version
+```
+
+---
+
+## 2. Phase 0 — Compose lifecycle
+
+### Start Docker Desktop (if not running)
+
+```powershell
+Start-Process "${env:ProgramFiles}\Docker\Docker\Docker Desktop.exe"
+(ese comando solo sirve para mi maquina por que ahy tenemos instalado el Docker) 
+
+# Wait until the engine is ready (repeat until version prints, ~30–90s)
+docker info --format "{{.ServerVersion}}"
+```
+
+| Part | Meaning |
+|------|---------|
+| `Start-Process` | Launch Docker Desktop from terminal (GUI runs in tray; no need to open from Start menu) |
+| `docker info` | Fails until the daemon is up — use as readiness check before `compose` / `kind` |
+
+### Start stack (foreground — logs in terminal)
+
+```powershell
+docker compose -f deploy\compose\docker-compose.yml up --build
+```
+
+| Flag | Meaning |
+|------|---------|
+| `-f deploy\compose\docker-compose.yml` | Compose file path |
+| `up` | Create and start containers |
+| `--build` | Rebuild images before start |
+
+### Start stack (background / detached)
+
+```powershell
+docker compose -f deploy\compose\docker-compose.yml up --build -d
+```
+
+| Flag | Meaning |
+|------|---------|
+| `-d` | Detached — terminal free, logs via `docker compose logs` |
+
+### Stop stack (keep volumes)
+
+```powershell
+docker compose -f deploy\compose\docker-compose.yml down
+```
+
+### Stop stack + wipe volumes
+
+```powershell
+docker compose -f deploy\compose\docker-compose.yml down -v
+```
+
+| Flag | Meaning |
+|------|---------|
+| `-v` | Remove named/anonymous volumes (Redis data wiped) |
+
+### Restart one service
+
+```powershell
+docker compose -f deploy\compose\docker-compose.yml restart api
+```
+
+---
+
+## 3. Phase 0 — Build images
+
+Build individually (tags for rollback / audit):
+
+```powershell
+$sha = git rev-parse --short HEAD
+
+docker build -f deploy\docker\backend.Dockerfile -t dndapp-api:local .
+docker build -f deploy\docker\backend.Dockerfile -t dndapp-api:$sha .
+
+docker build -f deploy\docker\frontend.Dockerfile -t dndapp-web:local .
+docker build -f deploy\docker\frontend.Dockerfile -t dndapp-web:$sha .
+```
+
+List local images:
+
+```powershell
+docker images | Select-String "dndapp"
+```
+
+---
+
+## 4. Phase 0 — Smoke tests
+
+```powershell
+# API health
+Invoke-RestMethod http://localhost:3000/health
+
+# Frontend (browser)
+# http://localhost:4200
+
+# Service status
+docker compose -f deploy\compose\docker-compose.yml ps
+```
+
+---
+
+## 5. Phase 0 — Rollback drill
+
+Simulates a bad config promotion and recovery (manual pipeline discipline).
+
+### 5a. Baseline — stack healthy
+
+```powershell
+docker compose -f deploy\compose\docker-compose.yml up -d
+docker compose -f deploy\compose\docker-compose.yml ps
+docker compose -f deploy\compose\docker-compose.yml logs api --tail=30
+```
+
+### 5b. Sabotage — wrong Redis host (silent degradation)
+
+Edit `deploy/compose/docker-compose.yml` → set `REDIS_HOST: localhost` under `api.environment`.
+
+```powershell
+docker compose -f deploy\compose\docker-compose.yml down
+docker compose -f deploy\compose\docker-compose.yml up -d
+docker compose -f deploy\compose\docker-compose.yml ps
+docker compose -f deploy\compose\docker-compose.yml logs api --tail=50
+```
+
+**Expected lesson:** `api` may show `Up (healthy)` but logs show `ECONNREFUSED 127.0.0.1:6379` — `/health` does not check Redis.
+
+### 5c. Recover — revert config
+
+Revert `REDIS_HOST` to `redis` in compose file.
+
+```powershell
+docker compose -f deploy\compose\docker-compose.yml down
+docker compose -f deploy\compose\docker-compose.yml up -d
+docker compose -f deploy\compose\docker-compose.yml logs api --tail=30
+```
+
+### 5d. Rollback — previous image tag (optional)
+
+If you tagged by SHA and need to pin an older image:
+
+```powershell
+# Example: run api with older tag (adjust compose image: field or rebuild)
+docker compose -f deploy\compose\docker-compose.yml down
+# Edit compose to use image: dndapp-api:<older-sha> instead of build:
+docker compose -f deploy\compose\docker-compose.yml up -d
+```
+
+---
+
+## 6. Phase 0 — Troubleshoot
+
+```powershell
+# All service logs (follow)
+docker compose -f deploy\compose\docker-compose.yml logs -f
+
+# One service, last N lines
+docker compose -f deploy\compose\docker-compose.yml logs api --tail=100
+
+# Follow one service
+docker compose -f deploy\compose\docker-compose.yml logs -f api
+
+# Inspect container env
+docker compose -f deploy\compose\docker-compose.yml exec api printenv | Select-String "REDIS|FRONTEND|PORT"
+
+# Shell inside container
+docker compose -f deploy\compose\docker-compose.yml exec api sh
+```
+
+| Flag | Meaning |
+|------|---------|
+| `-f` | Follow log output (live) |
+| `--tail=N` | Show last N lines only |
+| `exec` | Run command inside running container |
+
+---
+
+## 7. Phase 1 — kind cluster
+
+### Create cluster
+
+```powershell
+kind create cluster --name dnd-dev
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--name dnd-dev` | Cluster name; kubectl context becomes `kind-dnd-dev` |
+
+### Verify cluster
+
+```powershell
+kubectl cluster-info --context kind-dnd-dev
+kubectl get nodes
+kubectl get namespaces
+```
+
+### List / switch context
+
+```powershell
+kubectl config get-contexts
+kubectl config use-context kind-dnd-dev
+```
+
+### Delete cluster (full teardown)
+
+```powershell
+kind delete cluster --name dnd-dev
+```
+
+---
+
+## 8. Phase 1 — Namespace
+
+### Apply namespace manifest
+
+```powershell
+kubectl apply -f deploy\k8s\base\namespace.yaml
+kubectl get namespace dnd-dev
+```
+
+### Fix wrong namespace name
+
+```powershell
+kubectl delete namespace dnd-app   # wrong name
+kubectl apply -f deploy\k8s\base\namespace.yaml
+kubectl get namespace dnd-dev
+```
+
+**Note:** `metadata.name` in YAML is the source of truth — not the filename.
+
+---
+
+## 9. Phase 1 — Redis
+
+### Apply manifests
+
+```powershell
+kubectl apply -f deploy\k8s\base\redis-deployment.yaml
+kubectl apply -f deploy\k8s\base\redis-service.yaml
+```
+
+### Verify
+
+```powershell
+kubectl get pods -n dnd-dev
+kubectl get svc -n dnd-dev
+kubectl describe pod -n dnd-dev -l app.kubernetes.io/name=redis
+kubectl logs -n dnd-dev -l app.kubernetes.io/name=redis --tail=30
+```
+
+### Delete Redis (re-apply workflow)
+
+```powershell
+kubectl delete -f deploy\k8s\base\redis-service.yaml
+kubectl delete -f deploy\k8s\base\redis-deployment.yaml
+```
+
+---
+
+## 10. Phase 1 — API
+
+### 10a. Build image + load into kind
+
+```powershell
+docker build -f deploy\docker\backend.Dockerfile -t dndapp-api:local .
+
+kind load docker-image dndapp-api:local --name dnd-dev
+```
+
+| Command | Meaning |
+|---------|---------|
+| `kind load docker-image` | Copies local Docker image into kind node (no registry in Phase 1) |
+| `--name dnd-dev` | Target cluster |
+
+**After code changes:** rebuild image, `kind load` again, then restart deployment (see §12).
+
+### 10b. Apply ConfigMap + Deployment + Service
+
+```powershell
+kubectl apply -f deploy\k8s\base\api-configmap.yaml
+kubectl apply -f deploy\k8s\base\api-deployment.yaml
+kubectl apply -f deploy\k8s\base\api-service.yaml
+```
+
+### 10c. Verify API pod
+
+```powershell
+kubectl get pods -n dnd-dev
+kubectl get svc -n dnd-dev
+kubectl logs -n dnd-dev -l app.kubernetes.io/name=api --tail=50
+kubectl describe pod -n dnd-dev -l app.kubernetes.io/name=api
+```
+
+**Ready column:** `1/1` = container passed readinessProbe (includes Redis TCP check).
+
+---
+
+## 11. Phase 1 — Verify and access
+
+### Port-forward API to localhost
+
+```powershell
+kubectl port-forward -n dnd-dev svc/api 3000:3000
+```
+
+| Part | Meaning |
+|------|---------|
+| `port-forward` | Tunnel from your PC into the cluster |
+| `svc/api` | Target Service (stable; survives pod restarts) |
+| `3000:3000` | `local_port:service_port` |
+
+In another terminal or browser:
+
+```powershell
+Invoke-RestMethod http://localhost:3000/health
+```
+
+### Port-forward both services (full stack UI)
+
+Use **two terminals** (each blocks while forwarding):
+
+```powershell
+# Terminal 1 — API
+kubectl port-forward -n dnd-dev svc/api 3000:3000
+
+# Terminal 2 — Web (SSR)
+kubectl port-forward -n dnd-dev svc/web 4200:4000
+```
+
+Browser: `http://localhost:4200`  
+API health: `http://localhost:3000/health`
+
+`FRONTEND_URL` in `api-configmap.yaml` must match the browser origin (`http://localhost:4200`) for CORS.
+
+### Port already in use (bind error)
+
+If you see `Only one usage of each socket address ... is normally permitted`:
+
+```powershell
+# See what holds the port (example: 3000)
+netstat -ano | Select-String ":3000 "
+
+# Option A: stop the old port-forward terminal (Ctrl+C) or compose stack
+docker compose -f deploy\compose\docker-compose.yml down
+
+# Option B: use a different LOCAL port (Service port stays the same)
+kubectl port-forward -n dnd-dev svc/api 3001:3000
+Invoke-RestMethod http://localhost:3001/health
+```
+
+| Part | Meaning |
+|------|---------|
+| `3001:3000` | Local **3001** → cluster Service port **3000** |
+| Two port-forwards on same local port | Not allowed — one listener per local port |
+
+### Full stack verify (all pods Ready)
+
+```powershell
+kubectl get pods,svc -n dnd-dev
+
+# Expect: redis, api, web — all READY 1/1
+Invoke-RestMethod http://localhost:3000/health
+(Invoke-WebRequest http://localhost:4200 -UseBasicParsing).StatusCode   # expect 200
+```
+
+**UI looks wrong but HTTP 200?** Infra is OK — likely application code (WIP branch/stash), not Kubernetes. Separate feature work from deploy verification.
+
+### Port-forward Redis (debug only)
+
+```powershell
+kubectl port-forward -n dnd-dev svc/redis 6379:6379
+```
+
+### Apply entire base folder (when all manifests exist)
+
+```powershell
+kubectl apply -f deploy\k8s\base\
+kubectl get all -n dnd-dev
+```
+
+| Command | Meaning |
+|---------|---------|
+| `get all` | Shortcut for pods, services, deployments, replicasets (not everything, but useful) |
+
+---
+
+## 12. Phase 1 — Rollback
+
+### 12a. Config rollback (ConfigMap)
+
+Edit `deploy/k8s/base/api-configmap.yaml` (e.g. revert `REDIS_HOST` from `localhost` to `redis`).
+
+```powershell
+kubectl apply -f deploy\k8s\base\api-configmap.yaml
+kubectl rollout restart deployment/api -n dnd-dev
+kubectl rollout status deployment/api -n dnd-dev
+kubectl get pods -n dnd-dev -w
+```
+
+| Command | Meaning |
+|---------|---------|
+| `rollout restart` | Recreate pods to pick up new env from ConfigMap |
+| `rollout status` | Wait until rollout finishes |
+| `-w` | Watch pod status until Ctrl+C |
+
+### 12b. Sabotage drill (Redis — K8s version of Phase 0 lesson)
+
+```powershell
+# 1. Edit api-configmap.yaml → REDIS_HOST: localhost
+kubectl apply -f deploy\k8s\base\api-configmap.yaml
+kubectl rollout restart deployment/api -n dnd-dev
+
+# 2. Observe: pod should stay 0/1 Ready (readinessProbe fails Redis TCP)
+kubectl get pods -n dnd-dev
+kubectl describe pod -n dnd-dev -l app.kubernetes.io/name=api
+
+# 3. Revert REDIS_HOST: redis, re-apply, restart
+kubectl apply -f deploy\k8s\base\api-configmap.yaml
+kubectl rollout restart deployment/api -n dnd-dev
+kubectl get pods -n dnd-dev
+```
+
+**Lesson:** Unlike compose, K8s readinessProbe catches bad `REDIS_HOST` — pod not Ready, no silent traffic.
+
+### 12c. Deployment revision rollback
+
+```powershell
+kubectl rollout history deployment/api -n dnd-dev
+kubectl rollout undo deployment/api -n dnd-dev
+kubectl rollout status deployment/api -n dnd-dev
+```
+
+Undo to specific revision:
+
+```powershell
+kubectl rollout undo deployment/api -n dnd-dev --to-revision=2
+```
+
+### 12d. Image rollback (local tags)
+
+```powershell
+docker build -f deploy\docker\backend.Dockerfile -t dndapp-api:local .
+kind load docker-image dndapp-api:local --name dnd-dev
+kubectl rollout restart deployment/api -n dnd-dev
+```
+
+To pin a specific tag, edit `image:` in `api-deployment.yaml`, then `kubectl apply -f ...`.
+
+---
+
+## 13. Phase 1 — Troubleshoot
+
+```powershell
+# Events (scheduling, probe failures, image pull)
+kubectl get events -n dnd-dev --sort-by='.lastTimestamp'
+
+# Pod details (Conditions, Events at bottom)
+kubectl describe pod -n dnd-dev <pod-name>
+
+# Logs — current container
+kubectl logs -n dnd-dev <pod-name> --tail=100
+
+# Logs — previous crashed container
+kubectl logs -n dnd-dev <pod-name> --previous
+
+# Follow logs
+kubectl logs -n dnd-dev -l app.kubernetes.io/name=api -f
+
+# Env inside running pod
+kubectl exec -n dnd-dev -it deploy/api -- printenv | Select-String "REDIS|FRONTEND|PORT"
+
+# Shell inside pod
+kubectl exec -n dnd-dev -it deploy/api -- sh
+
+# Check probes / readiness from describe
+kubectl describe pod -n dnd-dev -l app.kubernetes.io/name=api | Select-String "Ready|Liveness|Readiness|Warning|Error"
+```
+
+### Common fixes
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| `ImagePullBackOff` | Image not on kind node | `kind load docker-image ...` |
+| Pod `0/1 Ready` | readinessProbe failing | `describe pod` → Events; check `REDIS_HOST` |
+| `CrashLoopBackOff` | App exits on boot | `logs --previous`; check `FRONTEND_URL` in prod |
+| YAML apply parse error | Bad indentation | `spec` must be sibling of `metadata`, not under `labels` |
+| Wrong namespace | `-n` omitted | Add `-n dnd-dev` to every kubectl command |
+| `port-forward` bind error | Local port already used | §11 — Ctrl+C old forward, or use `3001:3000` |
+| Web logs: `Header "host" ... is not allowed` | Angular SSR + `httpGet` probe uses pod IP as Host | §14d — use `tcpSocket` probes on port 4000 |
+| `docker build` reads wrong file | Used `-f` twice instead of `-t` for tag | `docker build -f deploy\docker\....Dockerfile -t name:tag .` |
+
+### Angular SSR probe lesson (web deployment)
+
+Kubernetes `httpGet` probes call the pod by **pod IP** (`10.244.x.x:4000`), sending `Host: 10.244.x.x:4000`. Angular 19 SSR rejects unknown hosts (SSRF protection) — logs show:
+
+```text
+Header "host" with value "10.244.0.7:4000" is not allowed.
+```
+
+**Fix in `web-deployment.yaml`:** use `tcpSocket` on port `4000` (checks the port is open, no HTTP Host header). Browser access via `port-forward` uses `Host: localhost:4200` — that is allowed.
+
+**Alternative (not used in base):** `httpGet` with `httpHeaders: [{ name: Host, value: localhost }]`.
+
+---
+
+## 14. Phase 1 — Web frontend
+
+Manifests: `web-configmap.yaml`, `web-deployment.yaml`, `web-service.yaml` (same 3-file pattern as API).
+
+### 14a. Build image + load into kind
+
+```powershell
+docker build -f deploy\docker\frontend.Dockerfile -t dndapp-web:local .
+
+kind load docker-image dndapp-web:local --name dnd-dev
+```
+
+| Flag | Meaning |
+|------|---------|
+| `-f deploy\docker\frontend.Dockerfile` | Dockerfile path |
+| `-t dndapp-web:local` | **T**ag image name (common mistake: second `-f` instead of `-t`) |
+| `.` | Build context = repo root |
+
+Frontend image uses **npm ci** (not bun) — see master plan §2 Docker image builds.
+
+### 14b. Apply ConfigMap + Deployment + Service
+
+```powershell
+kubectl apply -f deploy\k8s\base\web-configmap.yaml
+kubectl apply -f deploy\k8s\base\web-deployment.yaml
+kubectl apply -f deploy\k8s\base\web-service.yaml
+```
+
+### 14c. Verify web pod
+
+```powershell
+kubectl get pods -n dnd-dev
+kubectl logs -n dnd-dev -l app.kubernetes.io/name=web --tail=10
+kubectl rollout status deployment/web -n dnd-dev
+```
+
+**Expected log:** `Node Express server listening on http://localhost:4000` (no repeating Host errors after §14d).
+
+### 14d. Fix Angular SSR probe noise (tcpSocket)
+
+If logs spam `Header "host" ... is not allowed`, ensure `web-deployment.yaml` uses **tcpSocket** probes (not `httpGet` on `/`):
+
+```yaml
+readinessProbe:
+  tcpSocket:
+    port: 4000
+  initialDelaySeconds: 15
+  periodSeconds: 10
+livenessProbe:
+  tcpSocket:
+    port: 4000
+  initialDelaySeconds: 30
+  periodSeconds: 20
+```
+
+Apply and roll out:
+
+```powershell
+kubectl apply -f deploy\k8s\base\web-deployment.yaml
+kubectl rollout status deployment/web -n dnd-dev
+kubectl logs -n dnd-dev -l app.kubernetes.io/name=web --tail=5
+```
+
+### 14e. Port-forward + browser
+
+```powershell
+kubectl port-forward -n dnd-dev svc/web 4200:4000
+```
+
+See §11 for running API + Web forwards together and port-conflict workarounds.
+
+---
+
+## 15. Full teardown (Phase 1 session end)
+
+```powershell
+# Remove app resources (keep cluster)
+kubectl delete namespace dnd-dev
+
+# Or delete entire cluster
+kind delete cluster --name dnd-dev
+```
+
+Recreate from scratch: §7 → §8 → §9 → §10 → §14.
+
+---
+
+## Cheat sheet — flags at a glance
+
+| Flag / pattern | Tool | Meaning |
+|----------------|------|---------|
+| `-d` | compose | Detached (background) |
+| `--build` | compose | Build before up |
+| `--tail=N` | compose / kubectl logs | Last N log lines |
+| `-f` | compose logs / kubectl apply | Follow logs / file path |
+| `-n dnd-dev` | kubectl | Namespace |
+| `-l app.kubernetes.io/name=api` | kubectl | Label selector |
+| `apply -f` | kubectl | Declarative create/update |
+| `delete -f` | kubectl | Delete resources from file |
+| `IfNotPresent` | Deployment | Use local image on node |
+| `tcpSocket` | Deployment probe | Check port open without HTTP (Angular SSR web) |
+| `port-forward` | kubectl | Local access to cluster Service |
+
+---
+
+*Maintained during the DnDApp deployment learning track. Update when new phases or manifests are added.*

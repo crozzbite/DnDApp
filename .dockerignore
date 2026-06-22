@@ -4,5 +4,7 @@
 **/coverage
 **/.angular
 frontend/bun.lock
+**/.env
+**/.env.*
 **/*.md
 !deploy/README.md

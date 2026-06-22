@@ -1,0 +1,40 @@
+# Deployment — Angular 19 SSR (npm ci image → node server.mjs)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: dnd-dev
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: dndapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+    spec:
+      containers:
+        - name: web
+          image: dndapp-web:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: web-config
+          readinessProbe:
+            # tcpSocket — avoids Angular SSR Host rejection from kubelet httpGet (pod IP as Host)
+            tcpSocket:
+              port: 4000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 20

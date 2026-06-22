@@ -33,6 +33,7 @@ This document captures decisions from the DevOps learning track. Use it as the s
 | Config | **ConfigMap** for non-secret config; **Secret** for Redis passwords / API keys |
 | State model | **Stateless** API pods; state in **Redis** (and future SQL if added) |
 | Hybrid edge | Keep **Vercel frontend** optional during learning; backend targets K8s path |
+| Docker image builds | **Backend:** bun (build) → node (run). **Frontend:** npm ci (build) → node (run). No bun in frontend Dockerfile — bun install unreliable in Docker for Angular SSR |
 
 ---
 
@@ -43,7 +44,7 @@ This document captures decisions from the DevOps learning track. Use it as the s
 | Frontend | Angular 19 + SSR (`npm run serve:ssr:DnDApp`) |
 | Backend | NestJS + Fastify; prefix `v1`; health at `/health` |
 | Redis | Required for BullMQ (`REDIS_HOST`, `REDIS_PORT`) |
-| Docker / K8s / CI | **Not in repo yet** (planned in OpenSpec Phase 7) |
+| Docker / K8s / CI | **Docker + compose + k8s/base** in `deploy/` (Phase 0–1); CI/GHCR in Phase 2+ |
 | Firebase | Only mentioned in docs; **no** `firebase.json` in tree |
 | Vercel | Referenced in specs; **no** `vercel.json` in local tree |
 | OpenSpec deployment spec | `openspec/changes/nexus-build-plan/specs/nexus-deployment/` |
@@ -139,7 +140,9 @@ deploy/
       prod/                     # Kustomize patches per namespace
 docs/deployment/
   DEPLOYMENT-MASTER-PLAN.md     # this file
-  phase-0-checklist.md          # tomorrow's session steps
+  COMMAND-REFERENCE.md          # copy-paste workflows (compose + k8s)
+  phase-0-checklist.md          # Phase 0 session steps
+  phase-1-checklist.md          # Phase 1 session steps (kind)
 ```
 
 ---
@@ -156,14 +159,14 @@ flowchart TD
   P0 --> P1 --> P2 --> P3 --> P4
 ```
 
-### Phase 0 — Local manual (NEXT SESSION)
+### Phase 0 — Local manual (COMPLETE)
 
 **Goal:** `docker compose up` → frontend + backend + redis reachable on localhost.
 
 Deliverables:
 
-1. `deploy/docker/backend.Dockerfile` (bun)
-2. `deploy/docker/frontend.Dockerfile` (bun/node for SSR)
+1. `deploy/docker/backend.Dockerfile` (bun build → node run)
+2. `deploy/docker/frontend.Dockerfile` (npm ci → node SSR)
 3. `deploy/compose/docker-compose.yml`
 4. Example ConfigMaps for local (optional file for compose env)
 5. Manual checklist: build → up → health → logs → down (rollback)
@@ -247,10 +250,10 @@ Promote **the same SHA** across namespaces. Production may pin `@sha256:...` for
 
 ## 14. Session handoff
 
-**Next command when resuming:** “Empezamos Fase 0”  
-**Follow:** `docs/deployment/phase-0-checklist.md`
+**Next command when resuming:** “Empezamos Fase 1” (or continue Phase 1)  
+**Follow:** `docs/deployment/phase-1-checklist.md` · **Commands:** `docs/deployment/COMMAND-REFERENCE.md`
 
-**Go/no-go:** GO for Phase 0 local only. NO-GO for AKS until Phase 0–1 exit criteria pass.
+**Go/no-go:** GO for Phase 1 kind local. NO-GO for AKS until Phase 1 exit criteria pass.
 
 ---
 

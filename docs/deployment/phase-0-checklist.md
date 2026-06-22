@@ -1,6 +1,7 @@
 # Phase 0 — Local manual deployment checklist
 
 **Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
+**Commands:** [COMMAND-REFERENCE.md](./COMMAND-REFERENCE.md) (§2–§6 compose workflows)  
 **Status:** ✅ COMPLETE (2026-06-09) — stack verified, rollback drill executed (REDIS_HOST sabotage → ECONNREFUSED diagnosis → recovery)
 
 ---
