@@ -250,10 +250,11 @@ Promote **the same SHA** across namespaces. Production may pin `@sha256:...` for
 
 ## 14. Session handoff
 
-**Next command when resuming:** “Empezamos Fase 1” (or continue Phase 1)  
-**Follow:** `docs/deployment/phase-1-checklist.md` · **Commands:** `docs/deployment/COMMAND-REFERENCE.md`
+**Phase 3:** ✅ COMPLETE (2026-06-22) — AKS `aks-dndapp`, five namespaces, Ingress smoke.  
+**Next command when resuming:** **"Empezamos Fase 4"**  
+**Follow:** `docs/deployment/phase-3-checklist.md` (archived complete) · **Commands:** `docs/deployment/COMMAND-REFERENCE.md` §17
 
-**Go/no-go:** GO for Phase 1 kind local. NO-GO for AKS until Phase 1 exit criteria pass.
+**Go/no-go:** GO for Phase 4 CI/CD (GitHub Actions). Cluster stopped when idle — `az aks start` before deploy practice.
 
 ---
 

@@ -796,7 +796,20 @@ docker push ghcr.io/crozzbite/dndapp-web:$sha
 
 ## 17. Phase 3 — Azure AKS
 
+**Status:** ✅ COMPLETE (2026-06-22) — cluster `aks-dndapp`, five namespaces, Ingress smoke on all `*.local` hosts.
+
 **Goal:** one AKS cluster, **five namespaces** (`dnd-dev` … `dnd-prod`), NGINX Ingress (HTTP). Same GHCR digest promoted everywhere; only ConfigMaps differ per environment.
+
+**Validated reference (this track):**
+
+| Item | Value |
+|------|--------|
+| Resource group | `rg-dndapp-learn` (eastus) |
+| Cluster | `aks-dndapp` |
+| Node VM | `Standard_D2s_v7` (free trial; B2s blocked) |
+| Ingress EXTERNAL-IP | `52.149.204.135` (yours may differ — use §17c) |
+| GHCR api digest | `sha256:09bc071032f9c861903e9e945cdca5f5e6c0dc6dc69dd0c60c0ce7e21b507978` |
+| GHCR web digest | `sha256:b4733fe5cca586a465289d1d436f95af74c72384c5ba804812a9db5a59a849d8` |
 
 **Session constants** (reuse in every Phase 3 terminal):
 
@@ -920,7 +933,7 @@ kubectl wait --namespace ingress-nginx `
 kubectl get svc -n ingress-nginx ingress-nginx-controller
 ```
 
-Note **EXTERNAL-IP** (may take 2–5 min on Azure LB). All namespace Ingresses share this IP; routing uses **Host** header (`dnd-dev.local`, etc.).
+Note **EXTERNAL-IP** (may take 2–5 min on Azure LB). **One IP for all environments** — NGINX routes by **Host** header (`dnd-dev.local`, `dnd-test.local`, …). The `.local` suffix is a **lab hostname** (no real DNS domain yet); apps run in **Azure**, not on your PC.
 
 ### 17d. GHCR pull secret (all namespaces)
 
@@ -944,24 +957,23 @@ foreach ($ns in $namespaces) {
 
 ### 17e. Deploy overlays
 
-Create `ghcr-pull` **before** or right after first namespace (see §17d). Then:
+**Typo traps:** `-Environment` (not `-Enviroment`); `$namespaces` (not `$namespace`); `kubectl` (not `cubectl`).
+
+Create `ghcr-pull` in all five namespaces (§17d), then:
 
 ```powershell
 cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
 
 kubectl config current-context   # aks-dndapp
 
-# First environment (validated 2026-06-22)
-.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment dev -Apply
-
-# Remaining four (Phase 3 exit criteria)
+# All five namespaces (idempotent — safe to re-run)
 .\deploy\k8s\scripts\Build-Overlay.ps1 -Environment all -Apply
 
-# Verify rollouts
+# Verify rollouts (pick any namespace)
 kubectl rollout status deployment/api -n dnd-dev
-kubectl rollout status deployment/web -n dnd-dev
-kubectl get pods -n dnd-dev
-kubectl get ingress -n dnd-dev -o wide
+kubectl rollout status deployment/web -n dnd-prod
+kubectl get pods -A | Select-String "dnd-"
+kubectl get ingress -A
 ```
 
 **Verify same digest across namespaces:**
@@ -972,6 +984,19 @@ kubectl get deploy -A -l app.kubernetes.io/part-of=dndapp `
 ```
 
 **Expected:** api + web in all five namespaces reference the same `@sha256:...` digests from Phase 2.
+
+**Pod count (portal “~30” is normal):**
+
+```powershell
+kubectl get pods -A --no-headers | ForEach-Object { ($_ -split '\s+')[0] } | Group-Object | Sort-Object Name
+```
+
+| Namespace | Expected pods |
+|-----------|----------------|
+| `dnd-dev` … `dnd-prod` | 3 each (api, web, redis) → **15 app pods** |
+| `ingress-nginx` | 1 |
+| `kube-system` | ~14 (DNS, CNI, metrics, …) |
+| **Total** | **~30** — not duplicate deploys |
 
 ### 17f. Ingress smoke test
 
@@ -989,20 +1014,28 @@ Add to `C:\Windows\System32\drivers\etc\hosts` (**Administrator** Notepad — a 
 notepad C:\Windows\System32\drivers\etc\hosts
 ```
 
-Append one line (replace IP with your EXTERNAL-IP from §17c):
+Append **one line** with **all five hosts** (replace IP with your EXTERNAL-IP from §17c):
 
 ```text
 52.149.204.135  dnd-dev.local dnd-test.local dnd-qa.local dnd-stage.local dnd-prod.local
 ```
 
-Smoke:
+If only `dnd-dev.local` is listed, other hosts fail with `Could not resolve host`.
+
+Smoke (all environments — same IP, different Host):
 
 ```powershell
 curl.exe http://dnd-dev.local/health
+curl.exe http://dnd-test.local/health
+curl.exe http://dnd-qa.local/health
+curl.exe http://dnd-stage.local/health
+curl.exe http://dnd-prod.local/health
 curl.exe -I http://dnd-dev.local/
 ```
 
-**Expected:** `{"status":"ok",...}` and `HTTP/1.1 200 OK`. `Could not resolve host` → hosts file not saved or missing admin edit.
+Browser: `http://dnd-test.local/` etc.
+
+**Expected:** `{"status":"ok",...}` on each `/health`. `Could not resolve host` → add missing hostnames to `hosts` (§17f admin Notepad).
 
 **Fallback (no Ingress yet):** port-forward works identically to Phase 1–2:
 
@@ -1040,7 +1073,42 @@ az aks nodepool scale --resource-group $RG --cluster-name $CLUSTER --name nodepo
 
 **Always stop when not practicing.** kind local remains free for day-to-day dev.
 
-### 17h. Troubleshoot
+### 17h. Azure Portal — where to look
+
+**Infrastructure (9 resources in “All resources”):** VMSS, Load Balancer, Public IPs, VNet in `MC_rg-dndapp-learn_aks-dndapp_eastus` — auto-created node resource group.
+
+**Kubernetes workloads:** open **`aks-dndapp`** in `rg-dndapp-learn` → left menu:
+
+| Portal menu (ES / EN) | What you see |
+|------------------------|--------------|
+| Espacios de nombres / Namespaces | `dnd-dev`, `dnd-test`, `dnd-qa`, `dnd-stage`, `dnd-prod` |
+| Cargas de trabajo / Workloads | All pods (~30: 15 app + system + ingress) |
+| Servicios e ingresos / Services and ingresses | Ingress per namespace; same ADDRESS, different HOSTS |
+
+**Power state:** cluster overview → **Estado de energía** / **Power state** → `Running` or `Stopped`.
+
+### 17i. Resume session (full workflow)
+
+```powershell
+$RG = "rg-dndapp-learn"
+$CLUSTER = "aks-dndapp"
+
+az aks start --resource-group $RG --name $CLUSTER
+az aks show -g $RG -n $CLUSTER --query powerState.code -o tsv
+kubectl get nodes
+
+# If ghcr token expired, recreate secrets (§17d) then:
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
+kubectl config current-context
+kubectl get pods -A | Select-String "dnd-"
+
+# Smoke one env
+curl.exe http://dnd-dev.local/health
+
+az aks stop --resource-group $RG --name $CLUSTER
+```
+
+### 17j. Troubleshoot
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
@@ -1051,11 +1119,14 @@ az aks nodepool scale --resource-group $RG --cluster-name $CLUSTER --name nodepo
 | `agentPoolProfile.count was 0` | system pool requires ≥1 node | cannot use `--node-count 0` on create for Camino Spot |
 | `--priority Spot` on `az aks create` | flags only on `nodepool add` | §17b note; create regular cluster first |
 | `Could not resolve host: dnd-dev.local` | hosts file not edited | §17f admin Notepad, not PowerShell `#` comment |
+| `dnd-dev.local` works, `dnd-test.local` fails | hosts missing other hostnames | §17f — add all five on one line |
+| Portal shows ~30 pods, expected 15 | counting system + ingress pods | §17e pod count table |
 | `ImagePullBackOff` on AKS | no `ghcr-pull` in namespace | §17d |
 | Ingress `404` / no address | controller not ready / no EXTERNAL-IP | §17c wait + `kubectl get svc -n ingress-nginx` |
 | Wrong cluster updated | context mix-up kind vs AKS | `kubectl config current-context` before apply |
 | CORS errors from API | `FRONTEND_URL` mismatch | edit `deploy/k8s/config/environments.json` + re-run Build-Overlay |
 | `az aks create` quota error | subscription limits | try another region or smaller VM |
+| `-Enviroment` / `$namespace` / `cubectl` | PowerShell typos | §17e typo traps |
 
 ---
 
