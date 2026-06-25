@@ -13,6 +13,13 @@ El proyecto se divide en dos dominios principales siguiendo el principio de sepa
 
 ---
 
+## 📦 Despliegue (DevOps track)
+
+- [docs/deployment/DEPLOYMENT-MASTER-PLAN.md](docs/deployment/DEPLOYMENT-MASTER-PLAN.md)
+- [docs/deployment/phase-0-checklist.md](docs/deployment/phase-0-checklist.md)
+
+---
+
 ## 🚀 Inicio Rápido
 
 ### Frontend

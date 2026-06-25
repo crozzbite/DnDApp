@@ -1,0 +1,17 @@
+# Service — stable DNS name "web" for SSR (port-forward 4200:4000 for browser access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: dnd-dev
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: dndapp
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: web
+  ports:
+    - name: http
+      port: 4000
+      targetPort: 4000

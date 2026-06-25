@@ -1,0 +1,12 @@
+# ConfigMap — non-secret config for Angular SSR (compose equivalent: web.environment)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: dnd-dev
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: dndapp
+data:
+  NODE_ENV: production
+  PORT: "4000"              # SSR server port inside container (compose maps host 4200 → 4000)

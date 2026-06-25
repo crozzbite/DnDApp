@@ -1,0 +1,47 @@
+# Deployment — "keep N copies of this container running" (compose equivalent: api service)
+# Owns the pod lifecycle: image, env, probes, restarts
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: dnd-dev
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: dndapp
+spec:
+  replicas: 1                 # How many api pods to run (scale to 2+ in prod for HA)
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api   # Deployment manages pods with this label
+  template:                   # Pod blueprint — each replica is created from this spec
+    metadata:
+      labels:
+        app.kubernetes.io/name: api   # Must match selector.matchLabels
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull           # Credentials to pull the private GHCR package
+      containers:
+        - name: api
+          image: ghcr.io/crozzbite/dndapp-api@sha256:3da3f26ded380dde02cd0c39e432d6d770330eb9a48da45fc32fbb0c0ed392e6  # P1-a: e7342ff — includes GET /ready
+          imagePullPolicy: Always        # Phase 2: force pull from GHCR (validates registry round-trip)
+          ports:
+            - containerPort: 3000       # Port the NestJS process listens on inside the pod
+              name: http
+          envFrom:
+            - configMapRef:
+                name: api-config        # Load all keys from ConfigMap as environment variables
+          readinessProbe:
+            # HTTP /ready — NestJS listener + Redis PING (same config as BullMQ)
+            httpGet:
+              path: /ready
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            # Process alive only — does NOT check Redis (see GET /health)
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 20

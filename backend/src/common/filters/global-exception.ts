@@ -12,6 +12,16 @@ import { FastifyReply, FastifyRequest } from 'fastify';
  * NERVOUS SYSTEM — Global Exception Filter
  * Escudo de seguridad que centraliza el manejo de errores y protege el Nexo.
  */
+function formatExceptionMessage(raw: string | object): string {
+  if (typeof raw === 'string') {
+    return raw;
+  }
+  if ('message' in raw && typeof raw.message === 'string') {
+    return raw.message;
+  }
+  return JSON.stringify(raw);
+}
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger('NexusGuard');
@@ -26,10 +36,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message =
+    const rawMessage =
       exception instanceof HttpException
         ? exception.getResponse()
         : 'Internal spectral error (The Nexus is unstable)';
+
+    const message = formatExceptionMessage(rawMessage);
 
     // Log estructurado para observabilidad
     this.logger.error({
@@ -45,7 +57,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       status: 'error',
       timestamp: new Date().toISOString(),
       path: request.url,
-      message: typeof message === 'string' ? message : (message as any).message,
+      message,
       statusCode: status,
     });
   }

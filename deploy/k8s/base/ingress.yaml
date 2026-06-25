@@ -1,0 +1,44 @@
+# Ingress — routes external HTTP to api + web Services (Phase 3 AKS)
+# TLS: add cert-manager Certificate when a custom domain exists (Phase 3+ / Phase 4)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dndapp
+  namespace: dnd-dev
+  labels:
+    app.kubernetes.io/part-of: dndapp
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3000
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3000
+          - path: /ready
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 4000

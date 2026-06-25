@@ -1,0 +1,17 @@
+# ConfigMap — non-secret configuration (compose equivalent: api.environment in docker-compose.yml)
+# Change values here without rebuilding the image; then: kubectl apply + rollout restart
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config          # Object name; referenced by Deployment envFrom.configMapRef
+  namespace: dnd-dev        # Isolated dev environment (master plan: dnd-dev namespace)
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: dndapp
+data:
+  # Injected as env vars into the api container (see api-deployment.yaml envFrom)
+  NODE_ENV: production      # NestJS production mode
+  PORT: "3000"              # API listen port (must match containerPort + Service port)
+  REDIS_HOST: redis         # K8s Service DNS name — NOT localhost (compose lesson: use service name)
+  REDIS_PORT: "6379"        # Redis Service port
+  FRONTEND_URL: http://localhost:4200  # CORS origin; matches port-forward to web (Paso 7)

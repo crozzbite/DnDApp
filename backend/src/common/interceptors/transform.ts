@@ -27,7 +27,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
     next: CallHandler,
   ): Observable<NexusResponse<T>> {
     return next.handle().pipe(
-      map((data) => ({
+      map((data: T) => ({
         status: 'success',
         timestamp: new Date().toISOString(),
         data,

@@ -57,7 +57,7 @@ export class CompendiumController {
     status: 400,
     description: 'Payload contains bad spirits (Invalid DTO).',
   })
-  async search(@Query() dto: SearchCompendiumDto) {
+  search(@Query() dto: SearchCompendiumDto) {
     // Sanitización de entrada (Protección contra Prompt Injection)
     const sanitizedQuery = NexusSanitizer.sanitizeQuery(dto.query);
 
@@ -100,7 +100,7 @@ export class CompendiumController {
     status: 404,
     description: 'Resource non-existent in this realm.',
   })
-  async getDetail(@Param('index') index: string) {
+  getDetail(@Param('index') index: string) {
     // Basic Slug validation (immune system)
     if (!/^[a-z0-9-]+$/.test(index)) {
       this.logger.warn({ evt: 'INVALID_INDEX_ATTEMPT', index });

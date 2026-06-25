@@ -19,7 +19,7 @@ export enum IngestionJobName {
 export interface IngestResourceJob {
   resourceId: string;
   category: CompendiumCategory;
-  rawData: any; // Se validara en el handler
+  rawData: unknown;
 }
 
 /**

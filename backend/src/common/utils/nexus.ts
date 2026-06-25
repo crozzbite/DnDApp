@@ -34,6 +34,6 @@ export class NexusSanitizer {
       '[EMAIL_REDACTED]',
     );
 
-    return JSON.parse(sanitized);
+    return JSON.parse(sanitized) as T;
   }
 }
