@@ -45,9 +45,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          # PAT con write:packages — el paquete se creó con push local (Phase 2);
-          # GITHUB_TOKEN no puede escribir hasta "Manage Actions access" en GHCR.
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push API image
         uses: docker/build-push-action@v6
