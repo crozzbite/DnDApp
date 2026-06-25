@@ -15,6 +15,18 @@ const app = express();
 const angularApp = new AngularNodeAppEngine();
 
 /**
+ * Liveness/readiness for K8s and compose — Express route, not Angular SSR.
+ * Avoids kubelet httpGet Host rejection (pod IP) on the SSR catch-all.
+ */
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
  * Example Express Rest API endpoints can be defined here.
  * Uncomment and define endpoints as necessary.
  *

@@ -563,20 +563,28 @@ kubectl describe pod -n dnd-dev -l app.kubernetes.io/name=api | Select-String "R
 | YAML apply parse error | Bad indentation | `spec` must be sibling of `metadata`, not under `labels` |
 | Wrong namespace | `-n` omitted | Add `-n dnd-dev` to every kubectl command |
 | `port-forward` bind error | Local port already used | §11 — Ctrl+C old forward, or use `3001:3000` |
-| Web logs: `Header "host" ... is not allowed` | Angular SSR + `httpGet` probe uses pod IP as Host | §14d — use `tcpSocket` probes on port 4000 |
+| Web logs: `Header "host" ... is not allowed` | Angular SSR + `httpGet` on `/` uses pod IP as Host | §14d — `httpGet /health` on Express route in `server.ts` |
 | `docker build` reads wrong file | Used `-f` twice instead of `-t` for tag | `docker build -f deploy\docker\....Dockerfile -t name:tag .` |
 
 ### Angular SSR probe lesson (web deployment)
 
-Kubernetes `httpGet` probes call the pod by **pod IP** (`10.244.x.x:4000`), sending `Host: 10.244.x.x:4000`. Angular 19 SSR rejects unknown hosts (SSRF protection) — logs show:
+Kubernetes `httpGet` probes on `/` hit the **Angular SSR** catch-all with `Host: <pod-ip>:4000`. Angular 19 rejects unknown hosts (SSRF protection).
 
-```text
-Header "host" with value "10.244.0.7:4000" is not allowed.
+**Canonical fix (Phase 4+):** `GET /health` on **Express** in `frontend/src/server.ts` (before SSR). Probes use `httpGet` path `/health` — no Host header tricks, no `tcpSocket`-only lie.
+
+```yaml
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 4000
+  timeoutSeconds: 5
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 4000
 ```
 
-**Fix in `web-deployment.yaml`:** use `tcpSocket` on port `4000` (checks the port is open, no HTTP Host header). Browser access via `port-forward` uses `Host: localhost:4200` — that is allowed.
-
-**Alternative (not used in base):** `httpGet` with `httpHeaders: [{ name: Host, value: localhost }]`.
+Browser/Ingress traffic to `/` still goes through SSR with allowed hosts from the client.
 
 ---
 
@@ -618,21 +626,33 @@ kubectl rollout status deployment/web -n dnd-dev
 
 **Expected log:** `Node Express server listening on http://localhost:4000` (no repeating Host errors after §14d).
 
-### 14d. Fix Angular SSR probe noise (tcpSocket)
+### 14d. Web HTTP probes (`/health` on Express)
 
-If logs spam `Header "host" ... is not allowed`, ensure `web-deployment.yaml` uses **tcpSocket** probes (not `httpGet` on `/`):
+`web-deployment.yaml` uses **httpGet `/health`** (not `tcpSocket`, not `httpGet /`).
+
+Express serves `/health` in `frontend/src/server.ts` before the Angular SSR catch-all — kubelet probes get HTTP 200 without SSR Host validation.
 
 ```yaml
 readinessProbe:
-  tcpSocket:
+  httpGet:
+    path: /health
     port: 4000
   initialDelaySeconds: 15
   periodSeconds: 10
+  timeoutSeconds: 5
 livenessProbe:
-  tcpSocket:
+  httpGet:
+    path: /health
     port: 4000
   initialDelaySeconds: 30
   periodSeconds: 20
+  timeoutSeconds: 5
+```
+
+Smoke (port-forward web to 4200):
+
+```powershell
+Invoke-RestMethod http://localhost:4200/health
 ```
 
 Apply and roll out:
@@ -1156,7 +1176,7 @@ az aks stop --resource-group $RG --name $CLUSTER
 | `apply -f` | kubectl | Declarative create/update |
 | `delete -f` | kubectl | Delete resources from file |
 | `IfNotPresent` | Deployment | Use local image on node |
-| `tcpSocket` | Deployment probe | Check port open without HTTP (Angular SSR web) |
+| `tcpSocket` | Deployment probe | Port-open only (legacy web workaround; prefer `httpGet /health` on Express) |
 | `port-forward` | kubectl | Local access to cluster Service |
 | `docker push` | docker | Upload an image to a registry (GHCR) |
 | `ghcr.io/<owner>/<name>:<tag>` | docker | Full registry image address |
