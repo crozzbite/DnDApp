@@ -1,0 +1,359 @@
+name: Validate PR
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited]
+
+jobs:
+  security-check:
+    name: Security - Validate Allowed Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for forbidden files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100
+            });
+            
+            // Allowed file patterns for community contributions
+            const allowedPatterns = [
+              /^community\/[^/]+\/SKILL\.md$/,              // community/skill-name/SKILL.md (required)
+              /^community\/[^/]+\/README\.md$/,             // community/skill-name/README.md (optional)
+              /^community\/[^/]+\/assets\/[^/]+\.(png|jpg|jpeg|gif|svg|webp|md)$/i,     // assets/: images + .md
+              /^community\/[^/]+\/references\/[^/]+\.(png|jpg|jpeg|gif|svg|webp|md)$/i, // references/: images + .md
+            ];
+            
+            // Forbidden patterns (executable/dangerous files)
+            const forbiddenPatterns = [
+              /\.(sh|bash|zsh|fish|ps1|bat|cmd|exe|bin|run)$/i,  // scripts
+              /\.(js|ts|mjs|cjs|jsx|tsx)$/i,                      // javascript/typescript
+              /\.(py|pyc|pyo|pyw)$/i,                              // python
+              /\.(rb|rake)$/i,                                     // ruby
+              /\.(go|rs|c|cpp|h|hpp)$/i,                          // compiled languages
+              /\.(php|pl|pm)$/i,                                   // php/perl
+              /\.(yml|yaml)$/i,                                    // workflow files
+              /\.(json|toml|ini|cfg)$/i,                          // config files
+              /^\.github\//,                                       // anything in .github
+              /^curated\//,                                        // curated folder (maintainers only)
+              /Makefile$/i,
+              /Dockerfile$/i,
+              /docker-compose/i,
+            ];
+            
+            const forbidden = [];
+            const notAllowed = [];
+            
+            for (const file of files) {
+              const filename = file.filename;
+              
+              // Check if it's explicitly forbidden
+              for (const pattern of forbiddenPatterns) {
+                if (pattern.test(filename)) {
+                  forbidden.push({ file: filename, reason: 'Forbidden file type' });
+                  break;
+                }
+              }
+              
+              // Check if it matches allowed patterns
+              const isAllowed = allowedPatterns.some(pattern => pattern.test(filename));
+              if (!isAllowed && !forbidden.find(f => f.file === filename)) {
+                notAllowed.push({ file: filename, reason: 'Not in allowed paths' });
+              }
+            }
+            
+            const allIssues = [...forbidden, ...notAllowed];
+            
+            if (allIssues.length > 0) {
+              let error = '## 🚨 Security Check Failed\n\n';
+              error += 'This PR contains files that are not allowed in community contributions:\n\n';
+              error += '| File | Reason |\n';
+              error += '|------|--------|\n';
+              
+              for (const issue of allIssues) {
+                error += `| \`${issue.file}\` | ${issue.reason} |\n`;
+              }
+              
+              error += '\n### Allowed Files for Community Skills\n\n';
+              error += '- `community/<skill-name>/SKILL.md` (required)\n';
+              error += '- `community/<skill-name>/README.md` (optional)\n';
+              error += '- `community/<skill-name>/assets/*` (images + .md files)\n';
+              error += '- `community/<skill-name>/references/*` (images + .md files)\n';
+              error += '\n### Not Allowed\n\n';
+              error += '- **Executable code files** (`.js`, `.ts`, `.py`, `.ex`, `.go`, etc.)\n';
+              error += '- Config files (`.yml`, `.json`, etc.)\n';
+              error += '- Anything in `.github/` or `curated/`\n';
+              error += '\n**Why?** Code examples must be inside markdown code blocks (not separate files) to prevent execution.\n';
+              error += '\n*If you believe this is a mistake, please open an issue.*';
+              
+              core.setFailed(error);
+            } else {
+              console.log('✅ Security check passed - all files are allowed');
+            }
+
+  validate-commits:
+    name: Validate Conventional Commits
+    needs: security-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout base repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const conventionalCommitRegex = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,100}/;
+            
+            // Get commits in this PR
+            const commits = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100
+            });
+            
+            const invalidCommits = [];
+            
+            for (const commit of commits.data) {
+              const message = commit.commit.message.split('\n')[0]; // First line only
+              
+              // Skip merge commits
+              if (message.startsWith('Merge ')) continue;
+              
+              if (!conventionalCommitRegex.test(message)) {
+                invalidCommits.push({
+                  sha: commit.sha.substring(0, 7),
+                  message: message
+                });
+              }
+            }
+            
+            if (invalidCommits.length > 0) {
+              let errorMessage = '## ❌ Invalid Commit Messages\n\n';
+              errorMessage += 'The following commits do not follow [Conventional Commits](https://www.conventionalcommits.org/):\n\n';
+              errorMessage += '| Commit | Message |\n';
+              errorMessage += '|--------|--------|\n';
+              
+              for (const commit of invalidCommits) {
+                errorMessage += `| \`${commit.sha}\` | ${commit.message} |\n`;
+              }
+              
+              errorMessage += '\n### Expected Format\n\n';
+              errorMessage += '```\n';
+              errorMessage += '<type>(<scope>): <description>\n\n';
+              errorMessage += 'Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert\n';
+              errorMessage += '```\n\n';
+              errorMessage += '### Examples\n\n';
+              errorMessage += '- `feat(community): add react-native skill`\n';
+              errorMessage += '- `fix(curated): correct typo in typescript skill`\n';
+              errorMessage += '- `docs: update README installation steps`\n';
+              
+              core.setFailed(errorMessage);
+            } else {
+              console.log('✅ All commits follow conventional commits format');
+            }
+
+  validate-skill-format:
+    name: Validate Skill Format
+    needs: security-check
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.title, '[Community Skill]') || contains(join(github.event.pull_request.labels.*.name, ','), 'community-skill')
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100
+            });
+            
+            const skillFiles = files
+              .filter(f => f.filename.startsWith('community/') && f.filename.endsWith('SKILL.md'))
+              .map(f => f.filename);
+            
+            console.log('Changed skill files:', skillFiles);
+            core.setOutput('files', JSON.stringify(skillFiles));
+
+      - name: Validate SKILL.md files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            const changedFiles = JSON.parse('${{ steps.changed-files.outputs.files }}');
+            
+            if (changedFiles.length === 0) {
+              console.log('No SKILL.md files changed in community/');
+              return;
+            }
+            
+            const errors = [];
+            const warnings = [];
+            
+            // Required frontmatter fields
+            const requiredFields = ['name', 'description'];
+            const recommendedFields = ['metadata'];
+            
+            // Required sections in the body
+            const requiredSections = [
+              { pattern: /^##\s+(When to Use|Trigger|Usage)/mi, name: 'When to Use / Trigger' },
+              { pattern: /^##\s+(Critical Patterns|Core Patterns|Patterns|Rules)/mi, name: 'Patterns / Rules' },
+              { pattern: /^##\s+(Code Examples?|Examples?)/mi, name: 'Code Examples' }
+            ];
+            
+            for (const file of changedFiles) {
+              console.log(`\nValidating: ${file}`);
+              
+              if (!fs.existsSync(file)) {
+                errors.push(`File not found: ${file}`);
+                continue;
+              }
+              
+              const content = fs.readFileSync(file, 'utf-8');
+              
+              // Check for YAML frontmatter
+              if (!content.startsWith('---')) {
+                errors.push(`${file}: Missing YAML frontmatter (must start with ---)`);
+                continue;
+              }
+              
+              // Extract frontmatter
+              const frontmatterEnd = content.indexOf('---', 3);
+              if (frontmatterEnd === -1) {
+                errors.push(`${file}: Invalid frontmatter (missing closing ---)`);
+                continue;
+              }
+              
+              const frontmatter = content.substring(3, frontmatterEnd).trim();
+              const body = content.substring(frontmatterEnd + 3).trim();
+              
+              // Validate required frontmatter fields
+              for (const field of requiredFields) {
+                const regex = new RegExp(`^${field}:`, 'm');
+                if (!regex.test(frontmatter)) {
+                  errors.push(`${file}: Missing required frontmatter field: \`${field}\``);
+                }
+              }
+              
+              // Check recommended fields
+              for (const field of recommendedFields) {
+                const regex = new RegExp(`^${field}:`, 'm');
+                if (!regex.test(frontmatter)) {
+                  warnings.push(`${file}: Consider adding frontmatter field: \`${field}\``);
+                }
+              }
+              
+              // Validate name format (lowercase, hyphens)
+              const nameMatch = frontmatter.match(/^name:\s*(.+)$/m);
+              if (nameMatch) {
+                const name = nameMatch[1].trim();
+                if (!/^[a-z0-9-]+$/.test(name)) {
+                  errors.push(`${file}: Skill name must be lowercase with hyphens only. Got: \`${name}\``);
+                }
+              }
+              
+              // Validate description includes trigger
+              const descMatch = frontmatter.match(/description:\s*>?\s*([\s\S]*?)(?=\n[a-z]|$)/i);
+              if (descMatch) {
+                const desc = descMatch[1].toLowerCase();
+                if (!desc.includes('trigger')) {
+                  warnings.push(`${file}: Description should include "Trigger:" to help AI know when to use this skill`);
+                }
+              }
+              
+              // Validate required sections in body
+              for (const section of requiredSections) {
+                if (!section.pattern.test(body)) {
+                  errors.push(`${file}: Missing required section: \`${section.name}\``);
+                }
+              }
+              
+              // Check for at least one code block
+              const codeBlockCount = (body.match(/```/g) || []).length / 2;
+              if (codeBlockCount < 1) {
+                errors.push(`${file}: Must include at least one code example (no code blocks found)`);
+              } else if (codeBlockCount < 3) {
+                warnings.push(`${file}: Consider adding more code examples (found ${codeBlockCount}, recommend 3+)`);
+              }
+              
+              // Check minimum content length
+              if (body.length < 500) {
+                warnings.push(`${file}: Skill content seems short (${body.length} chars). Consider adding more detail.`);
+              }
+              
+              console.log(`  ✓ Frontmatter present`);
+              console.log(`  ✓ ${codeBlockCount} code blocks found`);
+            }
+            
+            // Output results
+            let output = '';
+            
+            if (errors.length > 0) {
+              output += '## ❌ Skill Validation Errors\n\n';
+              output += 'The following issues must be fixed:\n\n';
+              for (const error of errors) {
+                output += `- ${error}\n`;
+              }
+              output += '\n';
+            }
+            
+            if (warnings.length > 0) {
+              output += '## ⚠️ Suggestions\n\n';
+              output += 'Consider addressing these (not required):\n\n';
+              for (const warning of warnings) {
+                output += `- ${warning}\n`;
+              }
+              output += '\n';
+            }
+            
+            if (errors.length === 0 && warnings.length === 0) {
+              console.log('\n✅ All skill files are valid!');
+            }
+            
+            if (output) {
+              output += '### Expected SKILL.md Structure\n\n';
+              output += '```markdown\n';
+              output += '---\n';
+              output += 'name: my-skill-name\n';
+              output += 'description: >\n';
+              output += '  What this skill does.\n';
+              output += '  Trigger: When to use this skill.\n';
+              output += 'metadata:\n';
+              output += '  author: your-github-username\n';
+              output += '  version: "1.0"\n';
+              output += '---\n\n';
+              output += '## When to Use\n\n';
+              output += '- Bullet points...\n\n';
+              output += '## Critical Patterns\n\n';
+              output += '### Pattern 1\n\n';
+              output += '```typescript\n';
+              output += '// code example\n';
+              output += '```\n\n';
+              output += '## Code Examples\n\n';
+              output += '```typescript\n';
+              output += '// more examples\n';
+              output += '```\n';
+              output += '```\n';
+            }
+            
+            if (errors.length > 0) {
+              core.setFailed(output);
+            } else if (warnings.length > 0) {
+              core.warning(output);
+            }

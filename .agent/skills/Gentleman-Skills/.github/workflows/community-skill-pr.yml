@@ -1,0 +1,103 @@
+name: Community Skill PR Handler
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+    paths:
+      - 'community/**/SKILL.md'
+
+jobs:
+  setup-voting:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Add labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: ['community-skill', 'voting']
+            });
+
+      - name: Extract skill info
+        id: skill-info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100
+            });
+            
+            const skillFile = files.find(f => 
+              f.filename.startsWith('community/') && f.filename.endsWith('SKILL.md')
+            );
+            
+            if (skillFile) {
+              const parts = skillFile.filename.split('/');
+              const skillName = parts[parts.length - 2]; // folder name before SKILL.md
+              core.setOutput('skill_name', skillName);
+              core.setOutput('skill_file', skillFile.filename);
+              console.log(`Found skill: ${skillName} at ${skillFile.filename}`);
+            }
+
+      - name: Post voting instructions
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const skillName = '${{ steps.skill-info.outputs.skill_name }}' || 'this skill';
+            const votingEndDate = new Date();
+            votingEndDate.setDate(votingEndDate.getDate() + 7);
+            const formattedDate = votingEndDate.toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            });
+            
+            const body = `## 🗳️ Community Skill Voting
+
+            Thank you for submitting **${skillName}**! 
+
+            ### How to Vote
+
+            Community members, please vote using reactions on this PR:
+
+            | Vote | Reaction |
+            |------|----------|
+            | ✅ **Approve** | 👍 👏 🎉 🚀 ❤️ (any positive) |
+            | ❌ **Reject** | 👎 |
+
+            ### Voting Period
+
+            **Ends: ${formattedDate}** (7 days from now)
+
+            ### Acceptance Criteria
+
+            - Minimum 3 total votes required
+            - More positive votes than negative votes
+            - Skill follows the [contribution guidelines](../blob/main/CONTRIBUTING.md)
+
+            ---
+
+            *This comment was automatically generated. Maintainers may fast-track exceptional contributions.*`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: body
+            });
