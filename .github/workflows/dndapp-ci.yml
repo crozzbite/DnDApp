@@ -7,10 +7,10 @@ name: DnDApp CI
 on:
   # Cada PR hacia main (tu rama chore/deploy-phase0-1 → main disparará esto)
   pull_request:
-    branches: [main]
+    branches: [master]
   # Push directo a main (opcional; útil si mergeas sin PR)
   push:
-    branches: [main]
+    branches: [master]
 
 # Permisos mínimos — solo leer el repo (no secrets ni deploy en v1)
 permissions:
