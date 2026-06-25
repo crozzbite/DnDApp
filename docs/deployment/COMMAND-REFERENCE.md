@@ -35,6 +35,10 @@ cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
 | GHCR auth + build + push | 2 | [§16](#16-phase-2--ghcr-registry) |
 | Deploy by GHCR tag | 2 | [§16](#16-phase-2--ghcr-registry) |
 | Link package to repo (OCI label) | 2 / 4 | [§16h](#16h-link-ghcr-package-to-repo-oci-label--rebuild) |
+| **CI — local preflight** | 4 | [§18a](#18a-local-preflight-mirror-ci) |
+| **CI — PR + monitor (`gh`)** | 4 | [§18c](#18c-pr-merge-to-master) · [§18d](#18d-monitor-ci-from-terminal) |
+| **CI — troubleshoot** | 4 | [§18e](#18e-ci-troubleshoot) |
+| CD build + push (GHCR) | 4 | §18 — **Step D (next)** |
 
 ---
 
@@ -1160,6 +1164,165 @@ az aks stop --resource-group $RG --name $CLUSTER
 | CORS errors from API | `FRONTEND_URL` mismatch | edit `deploy/k8s/config/environments.json` + re-run Build-Overlay |
 | `az aks create` quota error | subscription limits | try another region or smaller VM |
 | `-Enviroment` / `$namespace` / `cubectl` | PowerShell typos | §17e typo traps |
+| CI run shows **cancelled** (X) | `concurrency: cancel-in-progress` + new push | §18e — check latest run, not the cancelled one |
+| `Deletion of directory failed` on `git checkout` | Windows file lock / OneDrive | §18e — `git reset --hard HEAD` then `git switch master` |
+| Submodule `No url found` on checkout | orphan submodule entry | vendor files or proper `.gitmodules`; §18e |
+
+---
+
+## 18. Phase 4 — CI (GitHub Actions)
+
+**Status:** ✅ CI v1 live on `master` (2026-06-25) — PR #3 (workflow) + PR #4 (`/health`, Gentleman-Skills).  
+**Workflow file:** `.github/workflows/dndapp-ci.yml`  
+**Workflow name in Actions UI:** `DnDApp CI`  
+**Default branch:** `master` (not `main`).
+
+**CI v1 scope:** lint + test + build only. **No** Redis in runner, **no** Docker build, **no** GHCR push, **no** AKS deploy, **no** Karma.
+
+### 18a. Local preflight (mirror CI)
+
+Run these locally **before** changing the workflow or opening a PR.
+
+**Backend** (`backend/` — bun 1.3.9 per `package.json` `packageManager`):
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp\backend
+bun install
+bun run lint
+bun run test
+bun run build
+```
+
+| Command | CI equivalent |
+|---------|----------------|
+| `bun install` | `bun install --frozen-lockfile` |
+| `bun run test` | unit + e2e (`jest` + `jest-e2e`) — 20 tests incl. `/health` `/ready` contracts |
+
+**Frontend** (`frontend/` — npm + **Node 22**, same as `frontend.Dockerfile`):
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp\frontend
+npm ci
+npm run build
+```
+
+| Pin | Where |
+|-----|--------|
+| Node **22** | `setup-node` in workflow + `node:22-alpine` in Dockerfiles |
+| bun **1.3.9** | `oven-sh/setup-bun` in workflow + `packageManager` in `backend/package.json` |
+
+### 18b. Workflow triggers and jobs
+
+```yaml
+# .github/workflows/dndapp-ci.yml (summary)
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+```
+
+| Job | Runner | Steps |
+|-----|--------|-------|
+| `backend` | `ubuntu-latest` | checkout → setup-bun → `bun install --frozen-lockfile` → lint → test → build |
+| `frontend` | `ubuntu-latest` | checkout → setup-node 22 → `npm ci` → `npm run build` |
+
+Jobs run **in parallel**. `permissions: contents: read` only — no secrets in v1.
+
+`concurrency` + `cancel-in-progress: true` cancels an in-flight run when a newer push hits the same PR (saves minutes).
+
+### 18c. PR + merge to `master`
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
+
+# Feature branch (example)
+git checkout -b chore/my-change
+# ... commit ...
+git push -u origin chore/my-change
+
+gh pr create --base master --title "feat: ..." --body "## Summary`n- ...`n`n## Test plan`n- [ ] DnDApp CI green"
+```
+
+After merge, CI runs again on **`push` to `master`**.
+
+```powershell
+gh pr merge <number> --merge
+# or squash:
+gh pr merge <number> --squash
+```
+
+Sync local `master` after merge:
+
+```powershell
+git switch master
+git pull origin master
+```
+
+If `git switch master` fails with `Deletion of directory ... failed`, answer **`n`**, then:
+
+```powershell
+git reset --hard HEAD
+git fetch origin
+git switch master
+git pull origin master
+```
+
+### 18d. Monitor CI from terminal
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
+
+# Recent runs
+gh run list --limit 5
+gh run list --workflow dndapp-ci.yml --limit 5
+gh run list --branch master --limit 5
+
+# Inspect one run (use ID from list)
+gh run view <RUN_ID>
+gh run view <RUN_ID> --verbose
+
+# Watch live until finish
+gh run watch <RUN_ID>
+gh run watch <RUN_ID> --exit-status
+
+# Logs in terminal
+gh run view <RUN_ID> --log
+gh run view <RUN_ID> --log --job "Backend (lint, test, build)"
+gh run view <RUN_ID> --log --job "Frontend (build)"
+```
+
+PR checks from CLI:
+
+```powershell
+gh pr checks
+gh pr view --json statusCheckRollup,url
+```
+
+### 18e. CI troubleshoot
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Run status **cancelled** (X in `gh run list`) | Newer push replaced it (`cancel-in-progress`) | Use the **latest** run — usually `success` |
+| Annotation: Node.js 20 deprecated | Internal runtime of `actions/checkout` / `setup-node` | Informational — frontend build still uses **Node 22** in the Build step |
+| `gh pr create` → `No commits between main and master` | Wrong base branch name | Use `--base master` |
+| `Head sha can't be blank` / no commits | Branch not pushed | `git push -u origin <branch>` first |
+| `fatal: No url found for submodule` in post-checkout | Orphan submodule in index | Remove submodule ref; vendor files under `.agent/skills/` (PR #4) |
+| Backend test fails on Redis | Expected locally without Redis | e2e mocks Redis TCP/PONG — if fail, run `bun run test` locally |
+| `npm ci` fails in CI | `package-lock.json` out of sync | Regenerate lock locally, commit, push |
+| `bun install --frozen-lockfile` fails | `bun.lock` out of sync | `bun install` locally, commit `bun.lock` |
+
+**Verified green runs (reference):**
+
+| Event | Run ID (approx.) | Notes |
+|-------|------------------|-------|
+| PR #3 merge → master | `28204230172` | First CI on master |
+| PR #4 CI | `28205247965` | `/health` + contract tests |
+| PR #4 merge → master | `28205354984` | Post-merge CI |
+
+### 18f. CD (Step D — not yet automated)
+
+Next workflow (planned): `.github/workflows/dndapp-cd-build.yml` — Docker build + push to GHCR on merge to `master`. Requires `write:packages` (`gh auth status`). See [phase-4-checklist.md](./phase-4-checklist.md) Step D.
 
 ---
 
@@ -1187,6 +1350,10 @@ az aks stop --resource-group $RG --name $CLUSTER
 | `az provider register` | Azure CLI | Enable AKS on new subscriptions |
 | `az aks stop/start` | Azure CLI | Cost control — pause/resume AKS cluster |
 | `Standard_D2s_v7` | AKS | Trial-friendly node VM size (eastus) |
+| `gh run list` / `gh run watch` | GitHub CLI | Monitor Actions from terminal (§18d) |
+| `gh pr create --base master` | GitHub CLI | Open PR — default branch is `master` |
+| `bun install --frozen-lockfile` | bun | CI install — lockfile must match `package.json` |
+| `dndapp-ci.yml` | GitHub Actions | CI workflow — lint/test/build on PR + push to `master` |
 
 ---
 

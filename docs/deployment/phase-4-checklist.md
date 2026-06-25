@@ -1,8 +1,8 @@
 # Phase 4 — CI/CD (GitHub Actions) checklist
 
 **Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
-**Command snippets:** [COMMAND-REFERENCE.md §18](./COMMAND-REFERENCE.md#18-phase-4--cicd-github-actions) — **deferred until CI is green** (inline commands below for now)  
-**Status:** 🔄 IN PROGRESS — Step A complete; JD P2 web probes done; next: `dndapp-ci.yml`
+**Command snippets:** [COMMAND-REFERENCE.md §18](./COMMAND-REFERENCE.md#18-phase-4--cicd-github-actions) — CI complete; CD subsection §18f pending  
+**Status:** 🔄 IN PROGRESS — **CI v1 ✅** (2026-06-25); next: **Step D** (`dndapp-cd-build.yml`)
 
 **Reference cluster:** `aks-dndapp` in `rg-dndapp-learn` (eastus) — **Stopped when idle**; `az aks start` before deploy practice.
 
@@ -15,7 +15,7 @@
 - [x] Phase 3 complete (AKS, five namespaces, Ingress smoke)
 - [x] Phase 2 complete (GHCR manual push + digest deploy)
 - [x] AKS `powerState: Stopped` when not practicing deploy (`az aks stop` after 2026-06-25 smoke)
-- [ ] `gh auth status` → repo access + `write:packages` (for GHCR push from Actions later)
+- [x] `gh auth status` → `repo`, `workflow`, `write:packages` (2026-06-25)
 - [ ] Git remote clean — **no PAT in URL** ([DEPLOYMENT-MASTER-PLAN §4](./DEPLOYMENT-MASTER-PLAN.md#4-security-prerequisite-do-before-phase-0-push))
 - [ ] Confirm **cost budget** — GitHub Actions free minutes + AKS only running during deploy drills
 
@@ -23,13 +23,13 @@
 
 ## Session goals
 
-1. **CI workflow** — test / lint / build on PR or push to agreed branch (`main` or feature branch)
+1. **CI workflow** — test / lint / build on PR or push to **`master`** ✅
 2. **CD build+push** — on merge to `main`, build images and push to GHCR with tag `<git-sha-short>`
 3. **CD deploy test** — automatically deploy that SHA to **`dnd-test`** on AKS
 4. **Promotion gates** — manual approval (or documented `workflow_dispatch`) for **`dnd-qa`**, **`dnd-stage`**, **`dnd-prod`**
 5. **`gga`** installed in repo (local guardrail) if applicable
 6. **No secrets in git** — GitHub Secrets / OIDC only
-7. **Docs** — this checklist complete; COMMAND-REFERENCE §18 after CI verified
+7. **Docs** — COMMAND-REFERENCE §18 CI ✅; §18f CD when Step D lands
 
 ---
 
@@ -113,16 +113,16 @@ Planned jobs (minimal v1):
 | `backend` | `backend/` | `bun install` → `bun run lint` → `bun run test` (unit+e2e) → `bun run build` |
 | `frontend` | `frontend/` | `npm ci` → `npm run build` (Node **22**) |
 
-- [ ] Create `.github/workflows/` directory
-- [ ] Add `dndapp-ci.yml` (CI only — agent guides, you review before push)
-- [ ] No secrets required for CI-only workflow
+- [x] Create `.github/workflows/` directory
+- [x] Add `dndapp-ci.yml` (merged PR #3)
+- [x] No secrets required for CI-only workflow
 
 ### C. Verify CI on GitHub
 
-- [ ] Push branch or open PR targeting `main`
-- [ ] Actions tab shows **ci** workflow running
-- [ ] Both jobs green
-- [ ] Fix failures before proceeding to CD
+- [x] Push branch or open PR targeting `master` (PR #3, #4)
+- [x] Actions tab shows **DnDApp CI** workflow running
+- [x] Both jobs green (incl. post-merge `28205354984`)
+- [x] Fix failures before proceeding to CD — N/A (green)
 
 ### D. CD — build + push to GHCR (after CI green)
 
@@ -164,19 +164,20 @@ Second workflow file (or `workflow` section in same repo — decide when impleme
 ### H. Documentation close-out
 
 - [ ] Mark all steps above complete in this file
-- [ ] Add **COMMAND-REFERENCE §18** (copy-paste commands for CI/CD) — **after CI verified**
+- [x] Add **COMMAND-REFERENCE §18** — CI section (2026-06-25)
+- [ ] Extend §18f when CD workflow is verified
 - [ ] Update [DEPLOYMENT-MASTER-PLAN.md §14](./DEPLOYMENT-MASTER-PLAN.md#14-session-handoff) handoff → Phase 4 complete
 
 ---
 
 ## Exit criteria (Phase 4 complete)
 
-- [ ] **CI:** test / lint / build on PR or push to agreed branch
+- [ ] **CI:** test / lint / build on PR or push to **`master`** ✅ (v1 done)
 - [ ] **CD push:** automatic GHCR push with SHA tag on merge to `main`
 - [ ] **CD deploy:** automatic deploy to **`dnd-test`** on AKS
 - [ ] **Promotion:** manual approval workflows for qa / stage / prod (or documented `workflow_dispatch`)
 - [ ] **`phase-4-checklist.md`** complete (this file)
-- [ ] **COMMAND-REFERENCE §18** added
+- [ ] **COMMAND-REFERENCE §18** added — CI ✅; CD pending §18f
 - [ ] **`gga`** installed if applicable
 - [ ] **No secrets in git** (audit `git log` / remote URL / workflow files)
 
@@ -205,4 +206,4 @@ Parked for later phases:
 
 ## Current step
 
-**→ Step A:** run backend + frontend local commands (§A above). Report pass/fail before creating `ci.yml`.
+**→ Step D:** CD build + push GHCR (`dndapp-cd-build.yml`). Preflight: `gh auth status` ✅ · local `master` synced.
