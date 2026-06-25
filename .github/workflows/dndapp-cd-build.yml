@@ -1,0 +1,80 @@
+# DnDApp — CD Build v1 (Phase 4 Step D)
+# Build Docker images + push to GHCR. Sin deploy AKS (Step E).
+
+name: DnDApp CD Build
+
+# CUÁNDO corre: después de que DnDApp CI termine en verde (push a master)
+on:
+  workflow_run:
+    workflows: ["DnDApp CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: dndapp-cd-build-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    name: Build + push GHCR (api + web)
+    # Solo merge/push a master con CI exitoso — no PRs ni runs fallidos
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout commit from CI run
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set image tag (short SHA)
+        id: tag
+        run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/backend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/crozzbite/dndapp-api:${{ steps.tag.outputs.short }}
+            ghcr.io/crozzbite/dndapp-api:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+            org.opencontainers.image.source=https://github.com/crozzbite/DnDApp
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/frontend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/crozzbite/dndapp-web:${{ steps.tag.outputs.short }}
+            ghcr.io/crozzbite/dndapp-web:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+            org.opencontainers.image.source=https://github.com/crozzbite/DnDApp
+
+      - name: Summary
+        run: |
+          echo "### Images pushed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`ghcr.io/crozzbite/dndapp-api:${{ steps.tag.outputs.short }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`ghcr.io/crozzbite/dndapp-web:${{ steps.tag.outputs.short }}\`" >> "$GITHUB_STEP_SUMMARY"
