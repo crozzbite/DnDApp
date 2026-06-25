@@ -1,0 +1,197 @@
+# Phase 4 — CI/CD (GitHub Actions) checklist
+
+**Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
+**Command snippets:** [COMMAND-REFERENCE.md §18](./COMMAND-REFERENCE.md#18-phase-4--cicd-github-actions) — **deferred until CI is green** (inline commands below for now)  
+**Status:** 🔄 IN PROGRESS — Phase 3.5 complete; next: Step A (local preflight) → Step B (`ci.yml`)
+
+**Reference cluster:** `aks-dndapp` in `rg-dndapp-learn` (eastus) — **Stopped when idle**; `az aks start` before deploy practice.
+
+**Learning mode:** one step at a time — agent explains, **you run commands**. Do not skip ahead to CD until CI passes on GitHub.
+
+---
+
+## Before you start
+
+- [x] Phase 3 complete (AKS, five namespaces, Ingress smoke)
+- [x] Phase 2 complete (GHCR manual push + digest deploy)
+- [x] AKS `powerState: Stopped` when not practicing deploy (`az aks stop` after 2026-06-25 smoke)
+- [ ] `gh auth status` → repo access + `write:packages` (for GHCR push from Actions later)
+- [ ] Git remote clean — **no PAT in URL** ([DEPLOYMENT-MASTER-PLAN §4](./DEPLOYMENT-MASTER-PLAN.md#4-security-prerequisite-do-before-phase-0-push))
+- [ ] Confirm **cost budget** — GitHub Actions free minutes + AKS only running during deploy drills
+
+---
+
+## Session goals
+
+1. **CI workflow** — test / lint / build on PR or push to agreed branch (`main` or feature branch)
+2. **CD build+push** — on merge to `main`, build images and push to GHCR with tag `<git-sha-short>`
+3. **CD deploy test** — automatically deploy that SHA to **`dnd-test`** on AKS
+4. **Promotion gates** — manual approval (or documented `workflow_dispatch`) for **`dnd-qa`**, **`dnd-stage`**, **`dnd-prod`**
+5. **`gga`** installed in repo (local guardrail) if applicable
+6. **No secrets in git** — GitHub Secrets / OIDC only
+7. **Docs** — this checklist complete; COMMAND-REFERENCE §18 after CI verified
+
+---
+
+## What we automate (map from manual phases)
+
+| Manual (Phases 2–3) | Automated (Phase 4) |
+|----------------------|---------------------|
+| `docker build` + tag `$sha` + `docker push` GHCR | Job on merge to `main` |
+| `Build-Overlay.ps1 -Environment test -Apply` | Job after successful GHCR push |
+| Re-apply overlay for qa/stage/prod | Separate workflow + **manual approval** |
+| Local `bun run lint/test/build` (backend) | CI job on every PR/push |
+| Local `ng build` (frontend) | CI job on every PR/push |
+
+**Image convention (unchanged):**
+
+```text
+ghcr.io/crozzbite/dndapp-api:<git-sha-short>
+ghcr.io/crozzbite/dndapp-web:<git-sha-short>
+```
+
+---
+
+## Steps
+
+### A. Preflight — local commands CI will call
+
+Prove the same commands work on your PC **before** writing YAML.
+
+**Backend** (`backend/` — bun):
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp\backend
+bun install
+bun run lint
+bun run test
+bun run build
+```
+
+**Frontend** (`frontend/` — npm per Dockerfile convention; Angular SSR):
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp\frontend
+npm ci
+npm run build
+```
+
+> `bun run test` runs **unit + e2e** (health/ready contracts). Frontend Karma deferred in v1 CI.
+
+- [ ] Backend lint / test / build pass locally
+- [ ] Frontend build passes locally
+- [ ] Record any failing step — fix or exclude from v1 workflow with documented reason
+
+### B. Scaffold GitHub Actions (CI only)
+
+First file — **no deploy, no GHCR push yet:**
+
+```text
+.github/workflows/ci.yml
+```
+
+Planned triggers (confirm before commit):
+
+- `pull_request` → branches: `main` (and feature branches if desired)
+- `push` → branches: `main` (optional for direct pushes)
+
+Planned jobs (minimal v1):
+
+| Job | Working directory | Commands |
+|-----|-------------------|----------|
+| `backend` | `backend/` | `bun install` → `bun run lint` → `bun run test` (unit+e2e) → `bun run build` |
+| `frontend` | `frontend/` | `npm ci` → `npm run build` |
+
+- [ ] Create `.github/workflows/` directory
+- [ ] Add `ci.yml` (CI only — agent guides, you review before push)
+- [ ] No secrets required for CI-only workflow
+
+### C. Verify CI on GitHub
+
+- [ ] Push branch or open PR targeting `main`
+- [ ] Actions tab shows **ci** workflow running
+- [ ] Both jobs green
+- [ ] Fix failures before proceeding to CD
+
+### D. CD — build + push to GHCR (after CI green)
+
+Second workflow file (or `workflow` section in same repo — decide when implementing):
+
+```text
+.github/workflows/cd-build-push.yml   # name TBD
+```
+
+- [ ] Trigger: `push` to `main` only (or merge event)
+- [ ] Build `deploy/docker/backend.Dockerfile` + `frontend.Dockerfile`
+- [ ] Tag with `git rev-parse --short HEAD`
+- [ ] Push to `ghcr.io/crozzbite/dndapp-api` + `dndapp-web`
+- [ ] Use `GITHUB_TOKEN` or `ghcr` PAT via **GitHub Secret** — never commit token
+- [ ] Package visibility linked to `crozzbite/DnDApp` (from Phase 2)
+
+### E. CD — deploy to `dnd-test` on AKS
+
+- [ ] `az aks start` before first deploy drill
+- [ ] GitHub Secret / OIDC for Azure + kubeconfig (no kubeconfig file in repo)
+- [ ] Workflow updates image tag in overlay or runs `Build-Overlay.ps1 -Environment test`
+- [ ] `kubectl apply` (or script) targets **`dnd-test`** only
+- [ ] Smoke: **`/ready` 200** + `/health` on test Ingress (or port-forward)
+- [ ] `az aks stop` after drill if not continuing same session
+
+### F. Promotion — qa / stage / prod (manual gate)
+
+- [ ] Workflow(s) with **`environment:`** + required reviewers in GitHub repo settings  
+  **or** documented `workflow_dispatch` with env input
+- [ ] Same SHA promoted; only ConfigMap/Secret differ per namespace
+- [ ] Human approval before apply to `dnd-qa`, `dnd-stage`, `dnd-prod`
+
+### G. Local guardrail — `gga`
+
+- [ ] `gga init` in repo root (if not already)
+- [ ] `gga install` — hooks active
+- [ ] `gga` passes before relying on CI as sole gate
+
+### H. Documentation close-out
+
+- [ ] Mark all steps above complete in this file
+- [ ] Add **COMMAND-REFERENCE §18** (copy-paste commands for CI/CD) — **after CI verified**
+- [ ] Update [DEPLOYMENT-MASTER-PLAN.md §14](./DEPLOYMENT-MASTER-PLAN.md#14-session-handoff) handoff → Phase 4 complete
+
+---
+
+## Exit criteria (Phase 4 complete)
+
+- [ ] **CI:** test / lint / build on PR or push to agreed branch
+- [ ] **CD push:** automatic GHCR push with SHA tag on merge to `main`
+- [ ] **CD deploy:** automatic deploy to **`dnd-test`** on AKS
+- [ ] **Promotion:** manual approval workflows for qa / stage / prod (or documented `workflow_dispatch`)
+- [ ] **`phase-4-checklist.md`** complete (this file)
+- [ ] **COMMAND-REFERENCE §18** added
+- [ ] **`gga`** installed if applicable
+- [ ] **No secrets in git** (audit `git log` / remote URL / workflow files)
+
+---
+
+## Cost reminders
+
+| Resource | Cost note |
+|----------|-----------|
+| GitHub Actions | Free tier minutes/month — usually enough for learning |
+| AKS | Bill while `Running` — **`az aks stop`** when not testing deploy from Actions |
+| GHCR | Storage for images; keep tag hygiene |
+
+---
+
+## After Phase 4
+
+Parked for later phases:
+
+- Custom domain + cert-manager TLS
+- Headless frontend tests in CI (Karma/Chrome)
+- Observability (Prometheus/Grafana)
+- PostgreSQL when backend adds persistence
+
+---
+
+## Current step
+
+**→ Step A:** run backend + frontend local commands (§A above). Report pass/fail before creating `ci.yml`.

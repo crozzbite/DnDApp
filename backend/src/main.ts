@@ -10,6 +10,7 @@ import compress from '@fastify/compress';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception';
 import { TransformInterceptor } from './common/interceptors/transform';
+import { registerHealthRoutes } from './health/register-health-routes';
 
 const isProduction = process.env['NODE_ENV'] === 'production';
 const logger = new Logger('Bootstrap');
@@ -45,15 +46,8 @@ async function bootstrap(): Promise<void> {
     threshold: 1024,
   });
 
-  // 4. Observability: Basic Health Check (Sanity probe)
-  app
-    .getHttpAdapter()
-    .getInstance()
-    .get('/health', async () => ({
-      status: 'ok',
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-    }));
+  // 4. Observability: /health (liveness) + /ready (Redis + HTTP readiness)
+  registerHealthRoutes(app);
 
   // 5. CORS Hardening
   const frontendUrl = process.env['FRONTEND_URL'];
@@ -105,7 +99,9 @@ async function bootstrap(): Promise<void> {
   logger.log(`🦇 Nexus Gateway Active: http://localhost:${port}/v1`);
   if (!isProduction) {
     logger.log(`📜 Documentation: http://localhost:${port}/docs`);
-    logger.log(`🏥 Health Probe: http://localhost:${port}/health`);
+    logger.log(
+      `🏥 Health: http://localhost:${port}/health | Ready: http://localhost:${port}/ready`,
+    );
   }
 }
 

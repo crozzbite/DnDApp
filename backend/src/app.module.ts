@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { CompendiumController } from './api/compendium/compendium';
+import { getRedisConnectionConfig } from './config/redis-connection.config';
 import { IngestionWorker } from './workers/ingestion/ingestion';
 import { INGESTION_QUEUE } from './workers/ingestion/ingestion-job';
 
@@ -11,10 +12,10 @@ import { INGESTION_QUEUE } from './workers/ingestion/ingestion-job';
 @Module({
   imports: [
     // ─── BullMQ (Soul-Harvesting Broker) ──────────────────────────────────
-    BullModule.forRoot({
-      connection: {
-        host: process.env['REDIS_HOST'] ?? 'localhost',
-        port: Number(process.env['REDIS_PORT'] ?? 6379),
+    BullModule.forRootAsync({
+      useFactory: () => {
+        const connection = getRedisConnectionConfig();
+        return { connection };
       },
     }),
     BullModule.registerQueue({

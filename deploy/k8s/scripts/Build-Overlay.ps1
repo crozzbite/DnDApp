@@ -60,6 +60,7 @@ metadata:
 data:
   NODE_ENV: production
   PORT: "3000"
+  # Must match backend/src/config/redis-connection.config.ts (DEFAULT_REDIS_*)
   REDIS_HOST: redis
   REDIS_PORT: "6379"
   FRONTEND_URL: $frontendUrl
@@ -96,6 +97,13 @@ spec:
                 port:
                   number: 3000
           - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3000
+          - path: /ready
             pathType: Exact
             backend:
               service:

@@ -25,19 +25,33 @@ When we sabotaged `REDIS_HOST: localhost` in the ConfigMap:
 
 Same silent-degradation class as Phase 0 compose (`/health` green while Redis down).
 
-## The fix
+## The fix (Phase 3.5 — canonical)
 
-Probe must read the **same env the app uses**:
+**Single source of truth:** `backend/src/config/redis-connection.config.ts` — same `REDIS_HOST`/`REDIS_PORT` for BullMQ and readiness.
+
+**Application gate:** `GET /ready` on the NestJS HTTP listener — sends Redis `PING` via the shared config. Returns **503** when Redis is unreachable; **200** when ready.
+
+**Kubernetes:** `readinessProbe.httpGet.path: /ready` (not exec TCP-only, not `/health`).
 
 ```yaml
-# GOOD — probe follows REDIS_HOST/REDIS_PORT, same as the app
-command:
-  - node
-  - -e
-  - "require('net').connect({port:Number(process.env.REDIS_PORT||6379),host:process.env.REDIS_HOST||'redis'},function(){this.end();process.exit(0)}).on('error',()=>process.exit(1))"
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 3000
+  timeoutSeconds: 5
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3000
 ```
 
-Now bad `REDIS_HOST` → probe fails → pod `0/1 Ready` → no traffic. Failure is **visible**.
+**Docker / Compose:** `HEALTHCHECK` and compose `healthcheck` target `/ready` (503 fails the check).
+
+Now bad `REDIS_HOST` → `/ready` 503 → pod `0/1 Ready` (K8s) or `unhealthy` (compose) → failure is **visible**.
+
+### Historical note (Phase 1 interim fix)
+
+Before Phase 3.5, an env-driven **exec** TCP probe was used. That validated Redis but could still bypass the HTTP listener. The canonical fix is **HTTP `/ready`** through application code.
 
 ## How to detect this class of failure
 
@@ -67,19 +81,19 @@ Two categories of hardcoding:
 
 | # | File | Field | Issue | Category | Action |
 |---|------|-------|-------|----------|--------|
-| 1 | `api-deployment.yaml` | `readinessProbe` host | Was `redis` hardcoded ≠ `REDIS_HOST` | DANGER | ✅ Fixed (uses env) |
+| 1 | `api-deployment.yaml` | `readinessProbe` | Was hardcoded / exec-only | DANGER | ✅ Fixed — `httpGet /ready` + shared config |
 | 2 | `api-deployment.yaml` | `livenessProbe` port `3000` | Hardcoded vs ConfigMap `PORT` | DRIFT | Keep consistent; Kustomize later |
 | 3 | `api-deployment.yaml` | `containerPort: 3000` | Hardcoded vs ConfigMap `PORT` | DRIFT | Keep consistent; Kustomize later |
 | 4 | `api-service.yaml` | `port` / `targetPort 3000` | Hardcoded vs ConfigMap `PORT` | DRIFT | Keep consistent; Kustomize later |
 | 5 | `web-deployment.yaml` | `containerPort 4000`, probe `4000` | Hardcoded vs `web-config PORT` | DRIFT | Keep consistent; Kustomize later |
 | 6 | `web-service.yaml` | `port` / `targetPort 4000` | Hardcoded vs `web-config PORT` | DRIFT | Keep consistent; Kustomize later |
-| 7 | `backend.Dockerfile` | `HEALTHCHECK ...:3000/health` | `/health` does NOT check Redis; Docker shows healthy while Redis down | DANGER (Docker layer) | Document; K8s readinessProbe is the real gate |
+| 7 | `backend.Dockerfile` | `HEALTHCHECK .../ready` | Was `/health` only (Redis-blind) | DANGER (Docker) | ✅ Fixed — `/ready` in Phase 3.5 |
 | 8 | `redis-deployment.yaml` | `containerPort 6379`, `redis-cli ping` | No host hardcode; ping is local | OK | No change |
 
 ### Priority fixes (apply AFTER the rollback drill)
 
-1. **#1 — DONE.** Probe now env-driven.
-2. **#7 — accept + document.** Docker `HEALTHCHECK` on `/health` is a liveness signal, not a Redis check. In K8s the **readinessProbe** (env-driven) is the authoritative Redis gate. Optionally add a `/ready` endpoint that pings Redis for a single source of truth.
+1. **#1 — DONE.** `httpGet /ready` + shared `getRedisConnectionConfig()`.
+2. **#7 — DONE.** Docker/compose healthcheck targets `/ready`.
 3. **#2–#6 — Kustomize (Phase 1 overlays).** Define `PORT` once per environment; let overlays patch ports + ConfigMap together so they can't drift.
 
 ### Guardrail going forward

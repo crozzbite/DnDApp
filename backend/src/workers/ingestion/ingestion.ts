@@ -21,7 +21,7 @@ import { NexusSanitizer } from '../../common/utils/nexus';
 export class IngestionWorker extends WorkerHost {
   private readonly logger = new Logger(IngestionWorker.name);
 
-  async process(job: Job): Promise<void> {
+  process(job: Job): Promise<void> {
     const jobName = job.name as IngestionJobName;
 
     this.logger.log({
@@ -34,7 +34,7 @@ export class IngestionWorker extends WorkerHost {
     try {
       switch (jobName) {
         case IngestionJobName.INGEST_RESOURCE:
-          await this.handleIngestResource(job.data as IngestResourceJob);
+          this.handleIngestResource(job.data as IngestResourceJob);
           break;
 
         case IngestionJobName.BULK_INGEST:
@@ -44,18 +44,21 @@ export class IngestionWorker extends WorkerHost {
         default:
           this.logger.error({ evt: 'UNKNOWN_JOB_SPIRIT', jobName });
       }
-    } catch (error) {
+
+      return Promise.resolve();
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       this.logger.error({
         evt: 'JOB_FAILED_INTERNAL',
         jobId: job.id,
-        error: error.message,
-        stack: error.stack,
+        error: err.message,
+        stack: err.stack,
       });
-      throw error; // BullMQ maneja el exponential backoff
+      return Promise.reject(err);
     }
   }
 
-  private async handleIngestResource(data: IngestResourceJob): Promise<void> {
+  private handleIngestResource(data: IngestResourceJob): void {
     const secureData = NexusSanitizer.sanitizeData(data.rawData);
 
     this.logger.log({

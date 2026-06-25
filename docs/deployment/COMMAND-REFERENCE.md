@@ -153,13 +153,16 @@ docker images | Select-String "dndapp"
 ## 4. Phase 0 — Smoke tests
 
 ```powershell
-# API health
+# API liveness (process up — does NOT check Redis)
 Invoke-RestMethod http://localhost:3000/health
+
+# API readiness (Redis PING — traffic gate)
+Invoke-RestMethod http://localhost:3000/ready
 
 # Frontend (browser)
 # http://localhost:4200
 
-# Service status
+# Service status — api should be healthy only when /ready passes
 docker compose -f deploy\compose\docker-compose.yml ps
 ```
 
@@ -177,7 +180,7 @@ docker compose -f deploy\compose\docker-compose.yml ps
 docker compose -f deploy\compose\docker-compose.yml logs api --tail=30
 ```
 
-### 5b. Sabotage — wrong Redis host (silent degradation)
+### 5b. Sabotage — wrong Redis host (failure must be visible)
 
 Edit `deploy/compose/docker-compose.yml` → set `REDIS_HOST: localhost` under `api.environment`.
 
@@ -186,9 +189,16 @@ docker compose -f deploy\compose\docker-compose.yml down
 docker compose -f deploy\compose\docker-compose.yml up -d
 docker compose -f deploy\compose\docker-compose.yml ps
 docker compose -f deploy\compose\docker-compose.yml logs api --tail=50
+
+# Readiness gate (traffic) — must fail
+Invoke-RestMethod http://localhost:3000/ready -ErrorAction SilentlyContinue
+# Or: curl.exe -i http://localhost:3000/ready   → expect HTTP 503
+
+# Liveness only — may still pass (by design)
+Invoke-RestMethod http://localhost:3000/health
 ```
 
-**Expected lesson:** `api` may show `Up (healthy)` but logs show `ECONNREFUSED 127.0.0.1:6379` — `/health` does not check Redis.
+**Expected (Phase 3.5+):** `api` shows **`unhealthy`** in `docker compose ps` (healthcheck targets `/ready`). Logs show `ECONNREFUSED 127.0.0.1:6379`. `/ready` returns **503**; `/health` may still return **200** — that split is intentional (liveness vs readiness). Failure is **visible**, not silent.
 
 ### 5c. Recover — revert config
 
@@ -426,6 +436,7 @@ kubectl get pods,svc -n dnd-dev
 
 # Expect: redis, api, web — all READY 1/1
 Invoke-RestMethod http://localhost:3000/health
+Invoke-RestMethod http://localhost:3000/ready
 (Invoke-WebRequest http://localhost:4200 -UseBasicParsing).StatusCode   # expect 200
 ```
 
@@ -1025,17 +1036,19 @@ If only `dnd-dev.local` is listed, other hosts fail with `Could not resolve host
 Smoke (all environments — same IP, different Host):
 
 ```powershell
+curl.exe http://dnd-dev.local/ready
 curl.exe http://dnd-dev.local/health
+curl.exe http://dnd-test.local/ready
 curl.exe http://dnd-test.local/health
-curl.exe http://dnd-qa.local/health
-curl.exe http://dnd-stage.local/health
-curl.exe http://dnd-prod.local/health
+curl.exe http://dnd-qa.local/ready
+curl.exe http://dnd-stage.local/ready
+curl.exe http://dnd-prod.local/ready
 curl.exe -I http://dnd-dev.local/
 ```
 
 Browser: `http://dnd-test.local/` etc.
 
-**Expected:** `{"status":"ok",...}` on each `/health`. `Could not resolve host` → add missing hostnames to `hosts` (§17f admin Notepad).
+**Expected:** `/ready` → `{"status":"ready","checks":{"redis":true},...}` on each env (Redis up). `/health` → `{"status":"ok",...}`. `Could not resolve host` → add missing hostnames to `hosts` (§17f admin Notepad).
 
 **Fallback (no Ingress yet):** port-forward works identically to Phase 1–2:
 

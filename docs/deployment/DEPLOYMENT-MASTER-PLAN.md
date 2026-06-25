@@ -42,7 +42,7 @@ This document captures decisions from the DevOps learning track. Use it as the s
 | Piece | State |
 |-------|--------|
 | Frontend | Angular 19 + SSR (`npm run serve:ssr:DnDApp`) |
-| Backend | NestJS + Fastify; prefix `v1`; health at `/health` |
+| Backend | NestJS + Fastify; prefix `v1`; **liveness** `/health`, **readiness** `/ready` (Redis PING) |
 | Redis | Required for BullMQ (`REDIS_HOST`, `REDIS_PORT`) |
 | Docker / K8s / CI | **Docker + compose + k8s/base** in `deploy/` (Phase 0–1); CI/GHCR in Phase 2+ |
 | Firebase | Only mentioned in docs; **no** `firebase.json` in tree |
@@ -251,10 +251,9 @@ Promote **the same SHA** across namespaces. Production may pin `@sha256:...` for
 ## 14. Session handoff
 
 **Phase 3:** ✅ COMPLETE (2026-06-22) — AKS `aks-dndapp`, five namespaces, Ingress smoke.  
-**Next command when resuming:** **"Empezamos Fase 4"**  
-**Follow:** `docs/deployment/phase-3-checklist.md` (archived complete) · **Commands:** `docs/deployment/COMMAND-REFERENCE.md` §17
-
-**Go/no-go:** GO for Phase 4 CI/CD (GitHub Actions). Cluster stopped when idle — `az aks start` before deploy practice.
+**Phase 3.5:** ✅ COMPLETE (2026-06-25) — `/health` vs `/ready`, GHCR digest, AKS smoke ×5, lint/test/build green.  
+**Phase 4:** 🔄 NEXT — GitHub Actions `ci.yml`; see `docs/deployment/phase-4-checklist.md`  
+**Follow:** `docs/deployment/phase-4-checklist.md` · **Commands:** `docs/deployment/COMMAND-REFERENCE.md` §17 (+ `/ready` smoke)
 
 ---
 

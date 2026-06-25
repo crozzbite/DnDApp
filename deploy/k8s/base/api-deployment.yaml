@@ -22,7 +22,7 @@ spec:
         - name: ghcr-pull           # Credentials to pull the private GHCR package
       containers:
         - name: api
-          image: ghcr.io/crozzbite/dndapp-api@sha256:09bc071032f9c861903e9e945cdca5f5e6c0dc6dc69dd0c60c0ce7e21b507978  # Phase 2: GHCR pinned by digest (immutable, tamper-evident)
+          image: ghcr.io/crozzbite/dndapp-api@sha256:3da3f26ded380dde02cd0c39e432d6d770330eb9a48da45fc32fbb0c0ed392e6  # P1-a: e7342ff — includes GET /ready
           imagePullPolicy: Always        # Phase 2: force pull from GHCR (validates registry round-trip)
           ports:
             - containerPort: 3000       # Port the NestJS process listens on inside the pod
@@ -31,18 +31,17 @@ spec:
             - configMapRef:
                 name: api-config        # Load all keys from ConfigMap as environment variables
           readinessProbe:
-            # Pod receives traffic only when this passes (Phase 0 lesson: validates Redis, not just /health)
-            exec:
-              command:
-                - node
-                - -e
-                - "require('net').connect({port:Number(process.env.REDIS_PORT||6379),host:process.env.REDIS_HOST||'redis'},function(){this.end();process.exit(0)}).on('error',()=>process.exit(1))"
-            initialDelaySeconds: 10     # Wait before first check (app + Redis startup)
-            periodSeconds: 10           # Re-check interval
-          livenessProbe:
-            # If this fails, kubelet restarts the container (app process dead/hung)
+            # HTTP /ready — NestJS listener + Redis PING (same config as BullMQ)
             httpGet:
-              path: /health             # NestJS health route (does NOT check Redis by design)
+              path: /ready
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            # Process alive only — does NOT check Redis (see GET /health)
+            httpGet:
+              path: /health
               port: 3000
             initialDelaySeconds: 30
             periodSeconds: 20
