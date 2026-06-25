@@ -72,7 +72,7 @@
 
 - [x] Build `dndapp-web:local`
 - [x] Web manifests applied
-- [x] `tcpSocket` probes (Angular SSR Host fix) — see COMMAND-REFERENCE §14d
+- [x] `httpGet /health` probes on Express (SSR Host fix) — see COMMAND-REFERENCE §14d
 - [x] `port-forward` → HTTP 200 on `:4200`
 - [ ] UI polish — **out of scope for deploy track** (WIP features / stash `WIP-DnDApp-2026-05-25`)
 

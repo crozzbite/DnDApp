@@ -33,7 +33,8 @@ This document captures decisions from the DevOps learning track. Use it as the s
 | Config | **ConfigMap** for non-secret config; **Secret** for Redis passwords / API keys |
 | State model | **Stateless** API pods; state in **Redis** (and future SQL if added) |
 | Hybrid edge | Keep **Vercel frontend** optional during learning; backend targets K8s path |
-| Docker image builds | **Backend:** bun (build) → node (run). **Frontend:** npm ci (build) → node (run). No bun in frontend Dockerfile — bun install unreliable in Docker for Angular SSR |
+| Docker image builds | **Backend:** bun (build) → **Node 22** alpine (run). **Frontend:** npm ci (build) → **Node 22** alpine (run). No bun in frontend Dockerfile — bun install unreliable in Docker for Angular SSR |
+| Node.js runtime pin | **22** — Dockerfiles (`node:22-alpine`), GitHub Actions frontend job (`setup-node` v22), CI workflow `dndapp-ci.yml` |
 
 ---
 

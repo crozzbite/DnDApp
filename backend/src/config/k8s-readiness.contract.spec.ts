@@ -72,3 +72,39 @@ describe('K8s api readiness contract', () => {
     expect(composeYaml).toMatch(/\/ready/);
   });
 });
+
+describe('K8s web HTTP probe contract', () => {
+  const webDeploymentYaml = readFileSync(
+    join(__dirname, '../../../deploy/k8s/base/web-deployment.yaml'),
+    'utf8',
+  );
+
+  const composeYaml = readFileSync(
+    join(__dirname, '../../../deploy/compose/docker-compose.yml'),
+    'utf8',
+  );
+
+  const serverTs = readFileSync(
+    join(__dirname, '../../../frontend/src/server.ts'),
+    'utf8',
+  );
+
+  it('gates web traffic with httpGet /health (Express, not Angular SSR)', () => {
+    expect(webDeploymentYaml).toMatch(/readinessProbe:/);
+    expect(webDeploymentYaml).toMatch(/livenessProbe:/);
+    expect(webDeploymentYaml).toMatch(/httpGet:/);
+    expect(webDeploymentYaml).toMatch(/path: \/health/);
+    expect(webDeploymentYaml).not.toMatch(/tcpSocket:/);
+  });
+
+  it('frontend server exposes GET /health before SSR catch-all', () => {
+    const healthIndex = serverTs.indexOf("app.get('/health'");
+    const ssrIndex = serverTs.indexOf("app.use('/**'");
+    expect(healthIndex).toBeGreaterThan(-1);
+    expect(ssrIndex).toBeGreaterThan(healthIndex);
+  });
+
+  it('compose web healthcheck targets /health', () => {
+    expect(composeYaml).toMatch(/4000\/health/);
+  });
+});

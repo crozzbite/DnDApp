@@ -2,7 +2,7 @@
 
 **Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
 **Command snippets:** [COMMAND-REFERENCE.md §18](./COMMAND-REFERENCE.md#18-phase-4--cicd-github-actions) — **deferred until CI is green** (inline commands below for now)  
-**Status:** 🔄 IN PROGRESS — Phase 3.5 complete; next: Step A (local preflight) → Step B (`ci.yml`)
+**Status:** 🔄 IN PROGRESS — Step A complete; JD P2 web probes done; next: `dndapp-ci.yml`
 
 **Reference cluster:** `aks-dndapp` in `rg-dndapp-learn` (eastus) — **Stopped when idle**; `az aks start` before deploy practice.
 
@@ -78,16 +78,27 @@ npm run build
 
 > `bun run test` runs **unit + e2e** (health/ready contracts). Frontend Karma deferred in v1 CI.
 
-- [ ] Backend lint / test / build pass locally
-- [ ] Frontend build passes locally
-- [ ] Record any failing step — fix or exclude from v1 workflow with documented reason
+- [x] Backend lint / test / build pass locally
+- [x] Frontend `npm ci` + `npm run build` pass locally (2026-06-25)
+- [x] Web K8s probes: `httpGet /health` on Express (JD P2 — not tcpSocket)
+- [ ] Record build warnings / npm audit debt (see Engram `dndapp/frontend-build-warnings`)
+
+### Runtime pin (canon — Lich + Gentleman)
+
+| Layer | Pin |
+|-------|-----|
+| Frontend Docker + CI | **Node 22** (`node:22-alpine`, `actions/setup-node` `node-version: '22'`) |
+| Backend CI | **bun** (`oven-sh/setup-bun`, `bun install --frozen-lockfile`) |
+| Backend Docker run stage | Node 22 alpine (Nest output via `node dist/main`) |
+
+Workflow file name: **`.github/workflows/dndapp-ci.yml`** (not generic `ci.yml` — multi-repo clarity).
 
 ### B. Scaffold GitHub Actions (CI only)
 
 First file — **no deploy, no GHCR push yet:**
 
 ```text
-.github/workflows/ci.yml
+.github/workflows/dndapp-ci.yml
 ```
 
 Planned triggers (confirm before commit):
@@ -100,10 +111,10 @@ Planned jobs (minimal v1):
 | Job | Working directory | Commands |
 |-----|-------------------|----------|
 | `backend` | `backend/` | `bun install` → `bun run lint` → `bun run test` (unit+e2e) → `bun run build` |
-| `frontend` | `frontend/` | `npm ci` → `npm run build` |
+| `frontend` | `frontend/` | `npm ci` → `npm run build` (Node **22**) |
 
 - [ ] Create `.github/workflows/` directory
-- [ ] Add `ci.yml` (CI only — agent guides, you review before push)
+- [ ] Add `dndapp-ci.yml` (CI only — agent guides, you review before push)
 - [ ] No secrets required for CI-only workflow
 
 ### C. Verify CI on GitHub
