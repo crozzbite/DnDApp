@@ -15,8 +15,14 @@ El proyecto se divide en dos dominios principales siguiendo el principio de sepa
 
 ## 📦 Despliegue (DevOps track)
 
-- [docs/deployment/DEPLOYMENT-MASTER-PLAN.md](docs/deployment/DEPLOYMENT-MASTER-PLAN.md)
-- [docs/deployment/phase-0-checklist.md](docs/deployment/phase-0-checklist.md)
+| Doc | Purpose |
+|-----|---------|
+| [DEPLOYMENT-MASTER-PLAN.md](docs/deployment/DEPLOYMENT-MASTER-PLAN.md) | Decision log + phase map |
+| [COMMAND-REFERENCE.md](docs/deployment/COMMAND-REFERENCE.md) | Copy-paste workflows + **§0 DAGs** |
+| [phase-4-checklist.md](docs/deployment/phase-4-checklist.md) | CI/CD close-out |
+| [ghcr-packages.md](docs/deployment/ghcr-packages.md) | GHCR package README templates |
+
+**API docs (Swagger):** `http://localhost:3000/docs` when running backend in dev — not the same as deployment runbooks.
 
 ---
 

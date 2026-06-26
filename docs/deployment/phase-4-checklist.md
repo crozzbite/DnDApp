@@ -2,11 +2,8 @@
 
 **Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
 **Command snippets:** [COMMAND-REFERENCE.md §18](./COMMAND-REFERENCE.md#18-phase-4--cicd-github-actions) — CI complete; CD subsection §18f pending  
-**Status:** 🔄 IN PROGRESS — **CI + CD (test) ✅** (2026-06-26); next: **Step G/H** (gga + docs close-out)
-
-**Promotion policy (2026-06-26):** **`dnd-test` auto** via `dndapp-cd-deploy.yml`; **`dnd-qa` / `dnd-stage` / `dnd-prod` manual** (`Build-Overlay.ps1 -ImageTag <sha> -Apply`) until Step F.
-
-**Reference cluster:** `aks-dndapp` in `rg-dndapp-learn` (eastus) — **Stopped when idle**; `az aks start` before deploy practice.
+**Status:** ✅ **COMPLETE** (2026-06-26) — learning track closed; Step F (GitHub environments) deferred  
+**Command snippets:** [COMMAND-REFERENCE.md](./COMMAND-REFERENCE.md) — §0 visual maps · §18 CI/CD · [ghcr-packages.md](./ghcr-packages.md)
 
 **Learning mode:** one step at a time — agent explains, **you run commands**. Do not skip ahead to CD until CI passes on GitHub.
 
@@ -170,27 +167,29 @@ $tag = git rev-parse --short HEAD   # or pinned SHA e.g. 0c51991
 
 - [x] `gga init` in repo root (2026-06-26)
 - [x] `gga install` — pre-commit hook active
-- [ ] Configure `.gga` `PROVIDER` + run `gga run` green on staged changes
+- [x] Configure `.gga` `PROVIDER` + run `gga run` green on staged changes (Gemini, commit `de48622`)
 
 ### H. Documentation close-out
 
-- [ ] Mark all steps above complete in this file
-- [x] Add **COMMAND-REFERENCE §18** — CI section (2026-06-25)
-- [ ] Extend §18f when CD workflow is verified
-- [ ] Update [DEPLOYMENT-MASTER-PLAN.md §14](./DEPLOYMENT-MASTER-PLAN.md#14-session-handoff) handoff → Phase 4 complete
+- [x] COMMAND-REFERENCE §0 visual maps (DAGs + promotion state)
+- [x] Extend §18f / §18g with verified CD runs + diagrams
+- [x] §18h manual promote commands
+- [x] [ghcr-packages.md](./ghcr-packages.md) — package README templates
+- [x] Mark all steps above complete in this file (exit criteria review)
+- [x] Update [DEPLOYMENT-MASTER-PLAN.md §14](./DEPLOYMENT-MASTER-PLAN.md#14-session-handoff) → Phase 4 complete
 
 ---
 
 ## Exit criteria (Phase 4 complete)
 
-- [ ] **CI:** test / lint / build on PR or push to **`master`** ✅ (v1 done)
-- [ ] **CD push:** automatic GHCR push with SHA tag on merge to `main`
-- [ ] **CD deploy:** automatic deploy to **`dnd-test`** on AKS
-- [ ] **Promotion:** manual approval workflows for qa / stage / prod (or documented `workflow_dispatch`)
-- [ ] **`phase-4-checklist.md`** complete (this file)
-- [ ] **COMMAND-REFERENCE §18** added — CI ✅; CD pending §18f
-- [ ] **`gga`** installed if applicable
-- [ ] **No secrets in git** (audit `git log` / remote URL / workflow files)
+- [x] **CI:** test / lint / build on PR or push to **`master`**
+- [x] **CD push:** automatic GHCR push with SHA tag on push to `master`
+- [x] **CD deploy:** automatic deploy to **`dnd-test`** on AKS
+- [x] **Promotion:** manual promote documented (§18h); GitHub `environment:` gates **deferred**
+- [x] **`phase-4-checklist.md`** final sign-off (this file)
+- [x] **COMMAND-REFERENCE §18** + §0 maps + ghcr-packages
+- [x] **`gga`** installed + Gemini provider
+- [x] **No secrets in git** — remote `origin` clean URL (2026-06-26 audit); workflows use secret **names** only
 
 ---
 
@@ -217,4 +216,4 @@ Parked for later phases:
 
 ## Current step
 
-**→ Step G/H:** Finish `gga` provider config + `gga run`; sync docs (§18h manual promote). Step F (GitHub environments) **deferred**.
+**→ Done.** Optional: paste [ghcr-packages.md](./ghcr-packages.md) into GHCR package READMEs; `az aks stop` when idle.
