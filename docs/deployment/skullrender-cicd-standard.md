@@ -1,7 +1,13 @@
-# SkullRender CI/CD standard (reference implementation: DnDApp)
+# SkullRender CI/CD standard
+
+> **Canon (normative):** `WorkDesktop/docs/refined-rules/skullrender-cicd-standard.md`  
+> Edit canon first; keep this file aligned when the standard changes.  
+> **Reference implementation:** this repo (DnDApp Phase 4).
 
 **Purpose:** Reusable pipeline pattern — CI → CD Build (GHCR) → CD Deploy (AKS via OIDC).  
 **No operational fingerprints in git:** project values live in GitHub Actions **variables**, **secrets**, and local `deploy/local.env.ps1` (gitignored).
+
+**Operational runbook (this repo only):** [COMMAND-REFERENCE.md](./COMMAND-REFERENCE.md) — not part of SkullRender canon.
 
 ---
 
@@ -61,10 +67,11 @@ flowchart TD
 
 ---
 
-## DnDApp instance (private — not in git)
+## This repo
 
-Values live in your local `deploy/local.env.ps1` and GitHub repo variables.  
-Runbook: [COMMAND-REFERENCE.md](./COMMAND-REFERENCE.md)
+- **Runbook:** [COMMAND-REFERENCE.md](./COMMAND-REFERENCE.md)
+- **Phase 4 checklist:** [phase-4-checklist.md](./phase-4-checklist.md)
+- **Local config:** `deploy/local.env.ps1` (gitignored) + [local.env.ps1.example](../../deploy/local.env.ps1.example)
 
 ---
 
