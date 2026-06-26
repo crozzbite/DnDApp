@@ -4,10 +4,11 @@
 **Purpose:** Day-to-day ops after Phase 4 — CI/CD, AKS, promote, troubleshoot.  
 **Shell:** PowerShell on Windows — chain with `;` (not `&&`).
 
+**Local constants (not in git):** copy [deploy/local.env.ps1.example](../deploy/local.env.ps1.example) → `deploy/local.env.ps1`. Sync to GitHub: `.\deploy\scripts\set-github-cicd-vars.ps1`. Standard: [skullrender-cicd-standard.md](./skullrender-cicd-standard.md).
+
 ```powershell
-cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
-$RG = "rg-dndapp-learn"
-$CLUSTER = "aks-dndapp"
+Set-Location (git rev-parse --show-toplevel)
+. .\deploy\local.env.ps1    # sets $RG, $CLUSTER — your file is gitignored
 ```
 
 **Learning track (Phases 0–3 manual):** [archive/COMMAND-REFERENCE-phases-0-3-manual.md](./archive/COMMAND-REFERENCE-phases-0-3-manual.md) · [phase-*-checklists](./phase-4-checklist.md)
@@ -81,7 +82,7 @@ Same **image SHA** everywhere; ConfigMap differs per namespace.
 
 ```powershell
 docker info --format "{{.ServerVersion}}"
-kubectl config current-context    # expect aks-dndapp for cloud ops
+kubectl config current-context    # expect $DndKubectlContext from local.env.ps1
 az account show -o table          # az login if needed
 git branch --show-current         # master
 gh auth status                    # repo, workflow, write:packages
@@ -96,7 +97,7 @@ gh auth status                    # repo, workflow, write:packages
 
 ## 2. AKS operations
 
-**Cluster:** `aks-dndapp` · **RG:** `rg-dndapp-learn` · **Context:** `kubectl config use-context aks-dndapp`
+**Cluster / RG:** from `local.env.ps1` · **Context:** `kubectl config use-context $DndKubectlContext`
 
 ### Start / stop (cost)
 
@@ -111,7 +112,8 @@ CD Deploy auto-starts the cluster if Stopped (may take ~12 min).
 ### Deploy with Build-Overlay
 
 ```powershell
-cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
+Set-Location (git rev-parse --show-toplevel)
+. .\deploy\local.env.ps1
 $tag = git rev-parse --short HEAD
 
 # Preview
@@ -133,14 +135,17 @@ kubectl get deploy -A -l app.kubernetes.io/part-of=dndapp `
 ### GHCR pull secret (once per namespace, or after token expiry)
 
 ```powershell
+$ghUser = gh api user -q .login   # your GitHub login — never hardcode in docs
 $namespaces = @("dnd-dev", "dnd-test", "dnd-qa", "dnd-stage", "dnd-prod")
 foreach ($ns in $namespaces) {
   kubectl create secret docker-registry ghcr-pull `
-    --docker-server=ghcr.io --docker-username=crozzbite `
+    --docker-server=ghcr.io --docker-username=$ghUser `
     --docker-password="$(gh auth token)" -n $ns `
     --dry-run=client -o yaml | kubectl apply -f -
 }
 ```
+
+> Token stays in `gh` credential store — **never** commit it. `$(gh auth token)` at runtime is correct.
 
 ### Ingress smoke (hosts file)
 
@@ -204,7 +209,7 @@ Push to `master` runs: **CI → CD Build → CD Deploy → dnd-test** (no manual
 ### 3d. CD Build (GHCR)
 
 - Workflow: `dndapp-cd-build.yml`
-- Pushes `ghcr.io/crozzbite/dndapp-api:<sha>` + `dndapp-web:<sha>`
+- Pushes `ghcr.io/<owner>/dndapp-api:<sha>` + `dndapp-web:<sha>` (owner = your GitHub user)
 - Requires **Manage Actions access → Write** on both GHCR packages
 
 ### 3e. CD Deploy (OIDC → dnd-test)
@@ -222,7 +227,8 @@ Secrets set (names only): `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPT
 **Manual deploy same tag as CI:**
 
 ```powershell
-kubectl config use-context aks-dndapp
+. .\deploy\local.env.ps1
+kubectl config use-context $DndKubectlContext
 $tag = git rev-parse --short HEAD
 .\deploy\k8s\scripts\Build-Overlay.ps1 -Environment test -ImageTag $tag -Apply
 ```
@@ -252,7 +258,7 @@ curl.exe http://dnd-prod.local/ready
 | `Could not resolve host` | Add all 5 `*.local` to hosts file |
 | Deploy workflow waits forever | AKS Stopped — wait for auto-start or `az aks start` |
 | CORS errors | Fix `FRONTEND_URL` in `deploy/k8s/config/environments.json` + re-apply overlay |
-| Wrong cluster | `kubectl config current-context` → `aks-dndapp` |
+| Wrong cluster | `kubectl config current-context` → must match `$DndKubectlContext` |
 | `bun install --frozen-lockfile` fails | `bun install` locally, commit `bun.lock` |
 | `npm ci` fails | Regenerate `package-lock.json`, commit |
 | gga / OneDrive checkout fail | `git reset --hard HEAD`; exclude huge files from review |
@@ -272,7 +278,7 @@ More rows (AKS create, kind, compose): [archive troubleshoot](./archive/COMMAND-
 | `gh pr create --base master` | gh | PR to correct default branch |
 | `az aks stop/start` | az | Cost control |
 | `bun install --frozen-lockfile` | bun | CI-parity install |
-| `ghcr.io/crozzbite/dndapp-api:<sha>` | GHCR | Image naming convention |
+| `ghcr.io/<owner>/dndapp-api:<sha>` | GHCR | Image naming convention |
 
 ---
 
