@@ -11,6 +11,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  actions: read
 
 concurrency:
   group: dndapp-cd-deploy-${{ github.event.workflow_run.head_branch }}
@@ -32,8 +33,21 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Verify upstream CD Build job succeeded
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id="${{ github.event.workflow_run.id }}"
+          conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs" \
+            --jq '.jobs[] | select(.name=="Build + push GHCR (api + web)") | .conclusion')
+          if [ "$conclusion" != "success" ]; then
+            echo "Upstream CD Build job conclusion: ${conclusion:-not found}"
+            exit 1
+          fi
+
       - name: Checkout commit from CD Build run
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
@@ -42,7 +56,7 @@ jobs:
         run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@1384c340ab2dda50fed2bee3041d1d87018aa5e8 # v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -86,6 +100,18 @@ jobs:
         run: |
           kubectl rollout status deployment/api -n dnd-test --timeout=300s
           kubectl rollout status deployment/web -n dnd-test --timeout=300s
+
+      - name: Verify deployed image tags
+        run: |
+          set -euo pipefail
+          expected="${{ steps.tag.outputs.short }}"
+          api_image=$(kubectl get deploy api -n dnd-test -o jsonpath='{.spec.template.spec.containers[0].image}')
+          web_image=$(kubectl get deploy web -n dnd-test -o jsonpath='{.spec.template.spec.containers[0].image}')
+          echo "api=$api_image"
+          echo "web=$web_image"
+          echo "expected suffix=:$expected"
+          [[ "$api_image" == *":$expected" ]] || { echo "API image mismatch"; exit 1; }
+          [[ "$web_image" == *":$expected" ]] || { echo "Web image mismatch"; exit 1; }
 
       - name: Smoke test (Ingress /ready + /health)
         shell: bash

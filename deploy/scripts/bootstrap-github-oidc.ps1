@@ -4,9 +4,11 @@
 # Usage:
 #   .\deploy\scripts\bootstrap-github-oidc.ps1
 #   .\deploy\scripts\bootstrap-github-oidc.ps1 -SetGitHubSecrets
+#   .\deploy\scripts\bootstrap-github-oidc.ps1 -SetGitHubSecrets -ApplyK8sRbac
 
 param(
-    [switch]$SetGitHubSecrets
+    [switch]$SetGitHubSecrets,
+    [switch]$ApplyK8sRbac
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,7 +19,24 @@ $GitHubRepo = 'DnDApp'
 $Branch = 'master'
 $RG = 'rg-dndapp-learn'
 $Cluster = 'aks-dndapp'
+$DeployNamespace = 'dnd-test'
 $FederatedName = 'github-dndapp-master'
+
+function Remove-RoleAssignmentIfExists {
+    param(
+        [string]$Assignee,
+        [string]$Scope,
+        [string]$RoleName
+    )
+    $ids = az role assignment list --assignee $Assignee --scope $Scope `
+        --query "[?roleDefinitionName=='$RoleName'].id" -o tsv 2>$null
+    foreach ($id in ($ids -split "`n")) {
+        if ($id.Trim()) {
+            az role assignment delete --ids $id.Trim() | Out-Null
+            Write-Host "Removed role '$RoleName' on scope (hardening)."
+        }
+    }
+}
 
 Write-Host "=== Azure account ===" -ForegroundColor Cyan
 $account = az account show | ConvertFrom-Json
@@ -37,6 +56,8 @@ if ($existing) {
     az ad sp create --id $ClientId | Out-Null
     Write-Host "Service principal created."
 }
+
+$spObjectId = az ad sp show --id $ClientId --query id -o tsv
 
 Write-Host "`n=== Federated credential (OIDC) ===" -ForegroundColor Cyan
 $subject = "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${Branch}"
@@ -58,19 +79,47 @@ try {
     Write-Host "Federated credential may already exist (OK if re-run)."
 }
 
-Write-Host "`n=== Role assignments ===" -ForegroundColor Cyan
+Write-Host "`n=== Role assignments (least privilege) ===" -ForegroundColor Cyan
 $clusterId = az aks show -g $RG -n $Cluster --query id -o tsv
 $rgId = az group show -n $RG --query id -o tsv
 
+# Remove legacy broad roles from prior bootstrap runs
+Remove-RoleAssignmentIfExists -Assignee $ClientId -Scope $rgId -RoleName 'Contributor'
+Remove-RoleAssignmentIfExists -Assignee $ClientId -Scope $clusterId -RoleName 'Azure Kubernetes Service RBAC Cluster Admin'
+
 $roles = @(
     @{ Role = 'Azure Kubernetes Service Cluster User Role'; Scope = $clusterId },
-    @{ Role = 'Azure Kubernetes Service RBAC Cluster Admin'; Scope = $clusterId },
-    @{ Role = 'Contributor'; Scope = $rgId }
+    @{ Role = 'Contributor'; Scope = $clusterId }
 )
 
 foreach ($r in $roles) {
     az role assignment create --assignee $ClientId --role $r.Role --scope $r.Scope 2>$null | Out-Null
-    Write-Host "Role: $($r.Role)"
+    Write-Host "Role: $($r.Role) (scope: cluster only)"
+}
+
+Write-Host "`n=== Kubernetes RBAC ($DeployNamespace only) ===" -ForegroundColor Cyan
+if ($ApplyK8sRbac) {
+    $rbacPath = Join-Path $env:TEMP 'dndapp-github-actions-rbac.yaml'
+    @"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: github-actions-deploy
+  namespace: $DeployNamespace
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: $spObjectId
+"@ | Set-Content -Path $rbacPath -Encoding utf8
+
+    kubectl apply -f $rbacPath
+    Write-Host "RoleBinding applied: github-actions-deploy in $DeployNamespace"
+} else {
+    Write-Host "Skipped. Re-run with -ApplyK8sRbac (kubectl context = aks-dndapp) to scope deploy to $DeployNamespace."
 }
 
 Write-Host "`n=== Values for GitHub Secrets ===" -ForegroundColor Green
@@ -88,4 +137,4 @@ if ($SetGitHubSecrets) {
     Write-Host "Secrets set on crozzbite/DnDApp"
 }
 
-Write-Host "`nDone. Re-run with -SetGitHubSecrets to push secrets via gh CLI." -ForegroundColor Green
+Write-Host "`nDone. Contributor is cluster-scoped (aks start/stop). K8s deploy scoped via RoleBinding in $DeployNamespace." -ForegroundColor Green

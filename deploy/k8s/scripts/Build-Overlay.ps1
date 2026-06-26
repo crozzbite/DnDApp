@@ -17,6 +17,10 @@ param(
     [switch]$Apply
 )
 
+if ($ImageTag -and $ImageTag -notmatch '^[0-9a-fA-F]{7,40}$') {
+    throw "Invalid ImageTag '$ImageTag'. Expected 7-40 hex chars (git short or full SHA)."
+}
+
 $ErrorActionPreference = 'Stop'
 
 $k8sRoot = Split-Path $PSScriptRoot -Parent

@@ -2,7 +2,9 @@
 
 **Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
 **Command snippets:** [COMMAND-REFERENCE.md §18](./COMMAND-REFERENCE.md#18-phase-4--cicd-github-actions) — CI complete; CD subsection §18f pending  
-**Status:** 🔄 IN PROGRESS — **CI v1 ✅** (2026-06-25); next: **Step D** (`dndapp-cd-build.yml`)
+**Status:** 🔄 IN PROGRESS — **CI + CD (test) ✅** (2026-06-26); next: **Step G/H** (gga + docs close-out)
+
+**Promotion policy (2026-06-26):** **`dnd-test` auto** via `dndapp-cd-deploy.yml`; **`dnd-qa` / `dnd-stage` / `dnd-prod` manual** (`Build-Overlay.ps1 -ImageTag <sha> -Apply`) until Step F.
 
 **Reference cluster:** `aks-dndapp` in `rg-dndapp-learn` (eastus) — **Stopped when idle**; `az aks start` before deploy practice.
 
@@ -145,20 +147,30 @@ Bootstrap (once): `deploy/scripts/bootstrap-github-oidc.ps1 -SetGitHubSecrets`
 - [x] `Build-Overlay.ps1 -Environment test -ImageTag <sha> -Apply`
 - [x] Verify first green deploy run on GitHub Actions (`28209417348`, tag `e934f87`)
 - [x] Smoke: **`/ready` 200** + `/health` via Ingress (workflow step)
-- [ ] `az aks stop` after drill if not continuing same session
+- [ ] `az aks stop` after drill if not continuing same session — **deferred** (cluster Running for continued practice)
 
 ### F. Promotion — qa / stage / prod (manual gate)
 
-- [ ] Workflow(s) with **`environment:`** + required reviewers in GitHub repo settings  
-  **or** documented `workflow_dispatch` with env input
-- [ ] Same SHA promoted; only ConfigMap/Secret differ per namespace
-- [ ] Human approval before apply to `dnd-qa`, `dnd-stage`, `dnd-prod`
+**Policy (2026-06-26):** auto deploy **only `dnd-test`**. qa / stage / prod **manual** for now.
+
+- [x] Same SHA promoted manually; ConfigMap differs per namespace (`Build-Overlay -Environment all -ImageTag 0c51991` — verified `/ready` ×5)
+- [ ] Workflow(s) with **`environment:`** + reviewers — **deferred** (Step F later)
+- [ ] Documented manual promote command in COMMAND-REFERENCE §18h
+
+**Manual promote (current canon):**
+
+```powershell
+$tag = git rev-parse --short HEAD   # or pinned SHA e.g. 0c51991
+.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment qa    -ImageTag $tag -Apply
+.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment stage -ImageTag $tag -Apply
+.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment prod  -ImageTag $tag -Apply
+```
 
 ### G. Local guardrail — `gga`
 
-- [ ] `gga init` in repo root (if not already)
-- [ ] `gga install` — hooks active
-- [ ] `gga` passes before relying on CI as sole gate
+- [x] `gga init` in repo root (2026-06-26)
+- [x] `gga install` — pre-commit hook active
+- [ ] Configure `.gga` `PROVIDER` + run `gga run` green on staged changes
 
 ### H. Documentation close-out
 
@@ -205,4 +217,4 @@ Parked for later phases:
 
 ## Current step
 
-**→ Step E:** Verify first OIDC deploy to `dnd-test` (`dndapp-cd-deploy.yml`). Bootstrap ✅ · push to trigger chain.
+**→ Step G/H:** Finish `gga` provider config + `gga run`; sync docs (§18h manual promote). Step F (GitHub environments) **deferred**.

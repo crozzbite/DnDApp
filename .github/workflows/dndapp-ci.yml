@@ -3,46 +3,39 @@
 
 name: DnDApp CI
 
-# CUÁNDO corre el workflow
 on:
-  # Cada PR hacia main (tu rama chore/deploy-phase0-1 → main disparará esto)
   pull_request:
     branches: [master]
-  # Push directo a main (opcional; útil si mergeas sin PR)
   push:
     branches: [master]
 
-# Permisos mínimos — solo leer el repo (no secrets ni deploy en v1)
 permissions:
   contents: read
 
-# Si llegan 2 runs del mismo PR, cancela el viejo y ahorra minutos
 concurrency:
   group: dndapp-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ─── Job 1: Backend (NestJS) — bun, igual que en tu máquina ───
   backend:
     name: Backend (lint, test, build)
-    runs-on: ubuntu-latest   # VM Linux gratuita de GitHub
+    runs-on: ubuntu-latest
 
     defaults:
       run:
-        working-directory: backend   # todos los "run:" empiezan en backend/
+        working-directory: backend
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4   # clona el código del commit/PR
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: 1.3.9   # debe coincidir con packageManager en backend/package.json
+          bun-version: 1.3.9
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        # --frozen-lockfile ≈ npm ci: falla si bun.lock no cuadra con package.json
 
       - name: Lint
         run: bun run lint
@@ -53,7 +46,6 @@ jobs:
       - name: Build
         run: bun run build
 
-  # ─── Job 2: Frontend (Angular SSR) — npm + Node 22, igual que Dockerfile ───
   frontend:
     name: Frontend (build)
     runs-on: ubuntu-latest
@@ -64,20 +56,17 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "22"   # canon: node:22-alpine en frontend.Dockerfile
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-          # cache: acelera npm ci reutilizando node_modules entre runs
 
       - name: Install dependencies
         run: npm ci
-        # instala exactamente lo del package-lock.json (reproducible)
 
       - name: Build
         run: npm run build
-        # ng build — genera dist/dn-dapp (browser + server SSR)
