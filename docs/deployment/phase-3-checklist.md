@@ -1,7 +1,7 @@
 # Phase 3 — Azure AKS checklist
 
 **Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
-**Command snippets:** [COMMAND-REFERENCE.md §17](./COMMAND-REFERENCE.md#17-phase-3--azure-aks)  
+**Command snippets:** [archive §17](./archive/COMMAND-REFERENCE-phases-0-3-manual.md#17-phase-3--azure-aks)  
 **Status:** ✅ COMPLETE (2026-06-22)
 
 **Reference cluster:** `aks-dndapp` in `rg-dndapp-learn` (eastus), node `Standard_D2s_v7`, Ingress IP `52.149.204.135`.
@@ -40,7 +40,7 @@
 - [x] `az provider register --namespace Microsoft.ContainerService` → Registered
 - [x] Note **kind** context vs **AKS** context — never apply to wrong cluster
 
-→ Commands: [COMMAND-REFERENCE §17a](./COMMAND-REFERENCE.md#17a-preflight-azure)
+→ Commands: [archive §17a](./archive/COMMAND-REFERENCE-phases-0-3-manual.md#17a-preflight-azure)
 
 ### B. Resource group + AKS cluster
 
@@ -49,20 +49,20 @@
 - [x] `az aks get-credentials` → context `aks-dndapp`
 - [x] `kubectl get nodes` → `Ready`
 
-→ Commands: [COMMAND-REFERENCE §17b](./COMMAND-REFERENCE.md#17b-create-aks-cluster)
+→ Commands: [archive §17b](./archive/COMMAND-REFERENCE-phases-0-3-manual.md#17b-create-aks-cluster)
 
 ### C. NGINX Ingress Controller
 
 - [x] Ingress controller installed in `ingress-nginx` namespace
 - [x] External IP assigned (`52.149.204.135`)
 
-→ Commands: [COMMAND-REFERENCE §17c](./COMMAND-REFERENCE.md#17c-nginx-ingress-controller)
+→ Commands: [archive §17c](./archive/COMMAND-REFERENCE-phases-0-3-manual.md#17c-nginx-ingress-controller)
 
 ### D. GHCR pull secret (per namespace)
 
 - [x] `ghcr-pull` in all five: `dnd-dev`, `dnd-test`, `dnd-qa`, `dnd-stage`, `dnd-prod`
 
-→ Commands: [COMMAND-REFERENCE §17d](./COMMAND-REFERENCE.md#17d-ghcr-pull-secret-all-namespaces)
+→ Commands: [archive §17d](./archive/COMMAND-REFERENCE-phases-0-3-manual.md#17d-ghcr-pull-secret-all-namespaces)
 
 ### E. Deploy overlays (Kustomize)
 
@@ -77,14 +77,14 @@
 - [x] `curl http://dnd-*.local/health` → OK on all five
 - [x] Web HTTP 200 in browser (UI WIP acceptable)
 
-→ Commands: [COMMAND-REFERENCE §17f](./COMMAND-REFERENCE.md#17f-ingress-smoke-test)
+→ Commands: [archive §17f](./archive/COMMAND-REFERENCE-phases-0-3-manual.md#17f-ingress-smoke-test)
 
 ### G. Cost control drill
 
 - [x] `az aks stop` / `az aks start` drill executed
 - [x] Verified `powerState: Stopped` / `Running`
 
-→ Commands: [COMMAND-REFERENCE §17g](./COMMAND-REFERENCE.md#17g-cost-control-stopstart)
+→ Commands: [archive §17g](./archive/COMMAND-REFERENCE-phases-0-3-manual.md#17g-cost-control-stopstart)
 
 ---
 
