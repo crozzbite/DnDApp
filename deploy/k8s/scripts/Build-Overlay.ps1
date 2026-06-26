@@ -148,10 +148,10 @@ patches:
 images:
   - name: ghcr.io/crozzbite/dndapp-api
     newName: ghcr.io/crozzbite/dndapp-api
-    newTag: $Tag
+    newTag: "$Tag"
   - name: ghcr.io/crozzbite/dndapp-web
     newName: ghcr.io/crozzbite/dndapp-web
-    newTag: $Tag
+    newTag: "$Tag"
 "@ | Add-Content -Path (Join-Path $outDir 'kustomization.yaml') -Encoding utf8
     }
 
