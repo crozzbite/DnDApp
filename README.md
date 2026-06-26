@@ -16,8 +16,8 @@ Bienvenido al sistema **Nexus**, una solución integral para el multiverso D&D b
 | Doc | Purpose |
 |-----|---------|
 | [DEPLOYMENT-MASTER-PLAN.md](docs/deployment/DEPLOYMENT-MASTER-PLAN.md) | Decision log + phase map |
-| [COMMAND-REFERENCE.md](docs/deployment/COMMAND-REFERENCE.md) | **Operational runbook** (CI/CD + AKS) + §0 DAGs |
-| [archive/](docs/deployment/archive/) | Phases 0–3 manual commands (learning) |
+| [skullrender-cicd-standard.md](docs/deployment/skullrender-cicd-standard.md) | **SkullRender CI/CD template** (reusable across repos) |
+| [COMMAND-REFERENCE.md](docs/deployment/COMMAND-REFERENCE.md) | Operational runbook (no fingerprints in git) |
 | [phase-4-checklist.md](docs/deployment/phase-4-checklist.md) | CI/CD close-out |
 | [ghcr-packages.md](docs/deployment/ghcr-packages.md) | GHCR package README (paste into GitHub Packages UI) |
 
