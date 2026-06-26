@@ -143,8 +143,8 @@ Bootstrap (once): `deploy/scripts/bootstrap-github-oidc.ps1 -SetGitHubSecrets`
 - [x] App Registration + federated credential (`repo:crozzbite/DnDApp:ref:refs/heads/master`)
 - [x] GitHub Secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`
 - [x] `Build-Overlay.ps1 -Environment test -ImageTag <sha> -Apply`
-- [ ] Verify first green deploy run on GitHub Actions
-- [ ] Smoke: **`/ready` 200** + `/health` via Ingress (workflow step)
+- [x] Verify first green deploy run on GitHub Actions (`28209417348`, tag `e934f87`)
+- [x] Smoke: **`/ready` 200** + `/health` via Ingress (workflow step)
 - [ ] `az aks stop` after drill if not continuing same session
 
 ### F. Promotion — qa / stage / prod (manual gate)
