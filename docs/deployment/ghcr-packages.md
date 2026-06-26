@@ -1,128 +1,54 @@
-# GHCR packages — DnDApp
+# GHCR packages — template
 
 **Registry:** [GitHub Container Registry](https://ghcr.io)  
-**Owner:** `crozzbite`  
-**Visibility:** **Private** (required — never public)  
-**Source repo:** [crozzbite/DnDApp](https://github.com/crozzbite/DnDApp)
+**Visibility:** **Private** (required)  
+**Source repo:** linked via OCI label at CI build time (`github.repository`)
 
-Copy sections below into each package’s **README** on GitHub (Package → Settings → Description / README) if the UI still shows generic auto text.
+Copy sections into each package **README** on GitHub (Package → Edit README).  
+Image names come from `GHCR_*_PACKAGE` variables — see [skullrender-cicd-standard.md](./skullrender-cicd-standard.md).
 
 ---
 
-## Package: `dndapp-api`
+## Package: `<api-package-name>`
 
 | Field | Value |
 |-------|--------|
-| Image | `ghcr.io/crozzbite/dndapp-api:<git-sha-short>` |
+| Image | `ghcr.io/<owner>/<api-package>:<git-sha-short>` |
 | Dockerfile | `deploy/docker/backend.Dockerfile` |
-| Runtime | Node 22 alpine (NestJS + Fastify) |
-| Build stage | bun 1.3.9 alpine |
-| Exposed port | `3000` |
-| Health | `GET /health` (liveness), `GET /ready` (Redis readiness) |
-| API prefix | `/v1` |
-
-### What it is
-
-Backend **Nexus Gateway** for DnDApp: compendium search, BullMQ workers, Redis-backed queues. Stateless HTTP pods; Redis holds queue state.
+| Health | `GET /health`, `GET /ready` |
 
 ### Tags
 
-| Tag pattern | Source | Use |
-|-------------|--------|-----|
-| `<short-sha>` e.g. `de48622` | CD Build on `master` | Deploy to K8s (`Build-Overlay -ImageTag`) |
-| `@sha256:…` | GHCR digest | Immutable pin (recommended for prod) |
+| Tag pattern | Source |
+|-------------|--------|
+| `<short-sha>` | CD Build on default branch |
+| `@sha256:…` | Immutable pin (prod) |
 
-**No `:latest`** in automated CI — only SHA tags.
+**No `:latest`** in automated CI.
 
 ### Pull (cluster)
 
-Requires `imagePullSecrets: ghcr-pull` in each namespace (see [COMMAND-REFERENCE §2](./COMMAND-REFERENCE.md#ghcr-pull-secret-once-per-namespace-or-after-token-expiry)).
-
-### Traceability
-
-OCI label on image:
-
-```text
-org.opencontainers.image.source=https://github.com/crozzbite/DnDApp
-```
-
-### Local run (dev)
-
-```powershell
-cd backend
-bun install
-bun run start:dev
-# Swagger (non-prod only): http://localhost:3000/docs
-```
+`imagePullSecrets: ghcr-pull` — see [COMMAND-REFERENCE §2](./COMMAND-REFERENCE.md#ghcr-pull-secret-once-per-namespace-or-after-token-expiry).
 
 ---
 
-## Package: `dndapp-web`
+## Package: `<web-package-name>`
 
 | Field | Value |
 |-------|--------|
-| Image | `ghcr.io/crozzbite/dndapp-web:<git-sha-short>` |
+| Image | `ghcr.io/<owner>/<web-package>:<git-sha-short>` |
 | Dockerfile | `deploy/docker/frontend.Dockerfile` |
-| Runtime | Node 22 alpine (Angular 19 SSR) |
-| Build | `npm ci` + `npm run build` |
-| SSR command | `node dist/DnDApp/server/server.mjs` |
-| Probe | `GET /health` on port 4000 |
+| Probe | `GET /health` |
 
-### What it is
-
-Frontend **Flesh layer**: Angular 19 standalone + SSR. Serves the D&D compendium UI; talks to the API via ingress routing (`/v1` → api service).
-
-### Tags
-
-Same convention as `dndapp-api` — **always promote the same SHA** for api + web together.
-
-### Pull (cluster)
-
-Same `ghcr-pull` secret as API.
-
-### Traceability
-
-Same OCI `org.opencontainers.image.source` label as API.
-
-### Local run (dev)
-
-```powershell
-cd frontend
-npm ci
-npm run start
-```
+Promote **same SHA** as API.
 
 ---
 
-## CI/CD supply chain (how images get here)
+## Supply chain
 
-```mermaid
-flowchart LR
-  M["merge master"]
-  CI["DnDApp CI"]
-  CD["CD Build"]
-  GHCR["GHCR push"]
-  M --> CI --> CD --> GHCR
-```
-
-| Workflow | Pushes |
-|----------|--------|
-| `dndapp-cd-build.yml` | Both packages after green CI |
-| Manual Phase 2 | `docker push` with local `gh auth token` |
-
-**Actions access:** each package needs **Manage Actions access → DnDApp → Write** (not just repo link).
-
-Full diagrams: [COMMAND-REFERENCE §0](./COMMAND-REFERENCE.md#0-visual-maps).
+Push via `dndapp-cd-build.yml` (or your project's `*-cd-build.yml`) after green CI.  
+Owner = `github.repository_owner`; package names = GitHub Actions **variables**.
 
 ---
 
-## Security notes
-
-- Packages remain **Private** — public repo ≠ public images.
-- Do not embed tokens, kubeconfig, or `.env` in layers (`.dockerignore` enforced).
-- GitHub Actions uses `GITHUB_TOKEN` for push; deploy uses Azure OIDC — no long-lived registry PAT in CI.
-- Report vulnerabilities via repo Issues — do not paste secrets.
-
----
-
-*Maintained with the DnDApp deployment learning track. Update when Dockerfile or workflow conventions change.*
+*DnDApp instance values: `deploy/local.env.ps1` (gitignored) + GitHub repo variables.*
