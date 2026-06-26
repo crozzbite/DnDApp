@@ -1,17 +1,124 @@
-<div class="filters-navar">
-  <p>dashboard works!</p>
-  @if (dnDService.dndclass(); as data) {
-  <ul>
-    @for (item of data.results; track item.index) {
-    <li>
-      {{ item.name }}
-      @if (navbarState.filterState() === 'spells') {
-      <span>LVL- {{ item.level }}</span>
-      <br>
-      }
-      <a [href]="item.url" target="_blank">go to link</a>
-    </li>
-    }
-  </ul>
+<div class="compendium-page">
+  <section class="compendium-hero">
+    <h1 class="compendium-hero__title">D&amp;D 5e Compendium</h1>
+    <p class="compendium-hero__subtitle">
+      Your ultimate companion for Dungeons &amp; Dragons 5th Edition. Search through
+      spells, monsters, equipment, and more.
+    </p>
+
+    <div class="compendium-search card shadow-sm">
+      <div class="compendium-search__row">
+        <input
+          type="search"
+          class="form-control compendium-search__input"
+          placeholder="Search for spells, monsters, items..."
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)"
+          (keydown)="onSearchKeydown($event)"
+          aria-label="Search compendium"
+        />
+        <select
+          class="form-select compendium-search__select"
+          [ngModel]="selectedCategory()"
+          (ngModelChange)="selectedCategory.set($event)"
+          aria-label="Content category"
+        >
+          @for (opt of categoryOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+        <button
+          type="button"
+          class="btn compendium-search__btn"
+          [disabled]="dndApi.isLoading()"
+          (click)="onSearch()"
+        >
+          @if (dndApi.isLoading()) {
+            Searching...
+          } @else {
+            Search
+          }
+        </button>
+      </div>
+    </div>
+  </section>
+
+  @if (dndApi.isLoading()) {
+    <div class="compendium-loading" role="status">
+      <div class="spinner-border compendium-loading__spinner" aria-hidden="true"></div>
+      <p>Searching the archives...</p>
+    </div>
   }
+
+  @if (showQuickAccess()) {
+    <section class="compendium-quick">
+      <h2 class="compendium-quick__heading">Quick Access</h2>
+      <div class="compendium-quick__grid">
+        @for (cat of quickCategories; track cat.key) {
+          <article class="compendium-card card">
+            <div class="compendium-card__icon" aria-hidden="true">{{ cat.icon }}</div>
+            <h3 class="compendium-card__title">{{ cat.label }}</h3>
+            <p class="compendium-card__desc">{{ cat.description }}</p>
+            <button
+              type="button"
+              class="btn compendium-card__btn"
+              (click)="onBrowse(cat.key)"
+            >
+              Browse {{ cat.label }}
+            </button>
+          </article>
+        }
+      </div>
+    </section>
+  }
+
+  @if (dndApi.hasSearched() && !dndApi.isLoading() && dndApi.searchResults().length > 0) {
+    <section class="compendium-results">
+      <h2 class="compendium-results__heading">
+        Search Results ({{ dndApi.searchResults().length }} found)
+      </h2>
+      <div class="compendium-results__grid">
+        @for (item of dndApi.searchResults(); track item.index) {
+          <article class="compendium-result-card card">
+            <div class="compendium-result-card__body">
+              <h3 class="compendium-result-card__title">{{ item.name }}</h3>
+              <span class="compendium-result-card__badge">
+                {{ dndApi.selectedCategory().replace('-', ' ') }}
+              </span>
+              @if (item.level !== undefined) {
+                <p class="compendium-result-card__meta">Level {{ item.level }}</p>
+              }
+            </div>
+            <a
+              class="btn btn-sm compendium-result-card__link"
+              [href]="apiUrl(item.url)"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View on API
+            </a>
+          </article>
+        }
+      </div>
+    </section>
+  }
+
+  @if (dndApi.hasSearched() && !dndApi.isLoading() && dndApi.searchResults().length === 0) {
+    <section class="compendium-empty">
+      <p>No results found. Try another search or category.</p>
+      <button type="button" class="btn compendium-card__btn" (click)="dndApi.resetSearch()">
+        Back to Quick Access
+      </button>
+    </section>
+  }
+
+  <footer class="compendium-footer">
+    <p>D&amp;D 5e Compendium v1.0 &bull; Built by CrozzBite with AI tools</p>
+    <p class="compendium-footer__muted">
+      Built with the official D&amp;D 5e SRD API &bull; Free to use for all adventurers
+    </p>
+    <p class="compendium-footer__muted">
+      Dungeons &amp; Dragons content is property of Wizards of the Coast
+    </p>
+  </footer>
 </div>

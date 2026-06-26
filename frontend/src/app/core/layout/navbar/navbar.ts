@@ -5,7 +5,6 @@ import {
   signal,
 } from '@angular/core';
 import { AppStateService } from '../../services/app-state/app';
-import { DndApiService } from '../../../features/compendium/services/dnd/dnd-api';
 
 @Component({
   selector: 'app-navbar',
@@ -17,7 +16,6 @@ import { DndApiService } from '../../../features/compendium/services/dnd/dnd-api
 })
 export class NavbarComponent {
   private readonly navarState = inject(AppStateService);
-  private readonly dnDService = inject(DndApiService);
 
   protected readonly stateList = this.navarState.AppStates;
   protected readonly ActualState = this.navarState.filterState;

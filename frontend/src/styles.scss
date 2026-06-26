@@ -1,89 +1,49 @@
-/* You can add global styles to this file, and also import other style files */
+/* SkullRender compendium theme — palette from dnd-5e-saas (Vercel reference) */
 
-// Variable overrides first
-$primary: #ff0000;
+$primary: #7f1d1d;
+$secondary: #c84e4e;
+$body-bg: #f5f3ef;
+$body-color: #3b3b3b;
 $enable-shadows: true;
 $prefix: "sr-";
 
-// Then import Bootstrap
 @use "bootstrap/scss/bootstrap";
 
 :root {
-  --color-primary: #000000;
-  --color-background: #ffffff;
-  --color-accent: #ff0000;
-  --color-surface: #fafafa;
-  --color-border: rgba(0, 0, 0, 0.1);
-  --transition-fast: 0.2s ease-in-out;
+  --sr-bg: #f5f3ef;
+  --sr-bg-hero-start: #faf8f4;
+  --sr-bg-hero-end: #e8e0d4;
+  --sr-foreground: #3b3b3b;
+  --sr-muted: #6b6560;
+  --sr-primary: #7f1d1d;
+  --sr-primary-hover: #6b1818;
+  --sr-secondary: #c84e4e;
+  --sr-card: #ffffff;
+  --sr-surface: #f5f0e8;
+  --sr-border: rgba(59, 59, 59, 0.15);
+  --sr-radius-md: 0.5rem;
+  --sr-radius-lg: 0.75rem;
+  --sr-transition: 0.2s ease-in-out;
+  --sr-font-serif: 'Lora', Georgia, 'Times New Roman', serif;
+  --sr-font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
-body, html {
-  background: var(--color-background);
-  color: var(--color-primary);
+body,
+html {
+  background: var(--sr-bg);
+  color: var(--sr-foreground);
   min-height: 100vh;
   margin: 0;
-  font-family: 'Outfit', 'Segoe UI', Arial, sans-serif;
+  font-family: var(--sr-font-sans);
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Outfit', sans-serif;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--sr-font-serif);
   font-weight: 700;
-  color: var(--color-primary);
-}
-
-.left-navar {
-  padding: 1.5rem;
-  height: 100%;
-}
-
-.nav-pills {
-  gap: 0.5rem;
-}
-
-.nav-pills .nav-link {
-  color: var(--color-primary);
-  border-radius: 4px;
-  transition: all var(--transition-fast);
-  border: 1px solid transparent;
-
-  &:hover {
-    background: var(--color-border);
-  }
-
-  &.active {
-    background: var(--color-primary);
-    color: white;
-  }
-}
-
-.dropdown-menu.custom {
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 0.5rem;
-}
-
-.dropdown-item {
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  
-  &:hover {
-    background: var(--color-surface);
-  }
-}
-
-.btn-accent {
-  background-color: var(--color-accent);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1.5rem;
-  font-weight: 600;
-  transition: opacity var(--transition-fast);
-
-  &:hover {
-    opacity: 0.9;
-  }
+  color: var(--sr-foreground);
 }

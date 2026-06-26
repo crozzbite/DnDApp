@@ -14,6 +14,7 @@ export class BuscadorComponent {
   private readonly dnDService = inject(DndApiService);
 
   get dndData() {
-    return this.dnDService.dndclass();
+    const results = this.dnDService.searchResults();
+    return { count: results.length, results };
   }
 }
