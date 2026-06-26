@@ -19,6 +19,7 @@ concurrency:
 jobs:
   backend:
     name: Backend (lint, test, build)
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
 
     defaults:
@@ -48,6 +49,7 @@ jobs:
 
   frontend:
     name: Frontend (build)
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
 
     defaults:

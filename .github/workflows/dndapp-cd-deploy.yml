@@ -18,17 +18,19 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AZURE_RESOURCE_GROUP: rg-dndapp-learn
-  AZURE_AKS_CLUSTER: aks-dndapp
-  DEPLOY_ENVIRONMENT: test
-  INGRESS_HOST: dnd-test.local
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+  AZURE_AKS_CLUSTER: ${{ vars.AZURE_AKS_CLUSTER }}
+  CD_DEPLOY_ENVIRONMENT: ${{ vars.CD_DEPLOY_ENVIRONMENT }}
+  INGRESS_HOST: ${{ vars.CD_INGRESS_HOST }}
+  DEPLOY_NAMESPACE: ${{ vars.K8S_NAMESPACE_PREFIX }}-${{ vars.CD_DEPLOY_ENVIRONMENT }}
 
 jobs:
   deploy-test:
-    name: Deploy to dnd-test (AKS)
+    name: Deploy to auto env (AKS)
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'master'
+      github.event.workflow_run.head_branch == 'master' &&
+      !contains(github.event.workflow_run.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -92,21 +94,21 @@ jobs:
         shell: pwsh
         run: |
           ./deploy/k8s/scripts/Build-Overlay.ps1 `
-            -Environment ${{ env.DEPLOY_ENVIRONMENT }} `
+            -Environment ${{ env.CD_DEPLOY_ENVIRONMENT }} `
             -ImageTag "${{ steps.tag.outputs.short }}" `
             -Apply
 
       - name: Wait for rollouts
         run: |
-          kubectl rollout status deployment/api -n dnd-test --timeout=300s
-          kubectl rollout status deployment/web -n dnd-test --timeout=300s
+          kubectl rollout status deployment/api -n ${{ env.DEPLOY_NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/web -n ${{ env.DEPLOY_NAMESPACE }} --timeout=300s
 
       - name: Verify deployed image tags
         run: |
           set -euo pipefail
           expected="${{ steps.tag.outputs.short }}"
-          api_image=$(kubectl get deploy api -n dnd-test -o jsonpath='{.spec.template.spec.containers[0].image}')
-          web_image=$(kubectl get deploy web -n dnd-test -o jsonpath='{.spec.template.spec.containers[0].image}')
+          api_image=$(kubectl get deploy api -n ${{ env.DEPLOY_NAMESPACE }} -o jsonpath='{.spec.template.spec.containers[0].image}')
+          web_image=$(kubectl get deploy web -n ${{ env.DEPLOY_NAMESPACE }} -o jsonpath='{.spec.template.spec.containers[0].image}')
           echo "api=$api_image"
           echo "web=$web_image"
           echo "expected suffix=:$expected"
@@ -127,8 +129,8 @@ jobs:
 
       - name: Summary
         run: |
-          echo "### Deployed to dnd-test" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Deployed to ${{ env.DEPLOY_NAMESPACE }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Image tag: \`${{ steps.tag.outputs.short }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Host: \`${{ env.INGRESS_HOST }}\`" >> "$GITHUB_STEP_SUMMARY"
-          kubectl get deploy -n dnd-test \
+          kubectl get deploy -n ${{ env.DEPLOY_NAMESPACE }} \
             -o custom-columns='NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image'

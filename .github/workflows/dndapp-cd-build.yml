@@ -17,6 +17,10 @@ concurrency:
   group: dndapp-cd-build-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
+env:
+  GHCR_API_PACKAGE: ${{ vars.GHCR_API_PACKAGE }}
+  GHCR_WEB_PACKAGE: ${{ vars.GHCR_WEB_PACKAGE }}
+
 jobs:
   build-and-push:
     name: Build + push GHCR (api + web)
@@ -24,7 +28,8 @@ jobs:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'master' &&
-      github.event.workflow_run.event == 'push'
+      github.event.workflow_run.event == 'push' &&
+      !contains(github.event.workflow_run.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
 
     steps:
@@ -53,10 +58,10 @@ jobs:
           context: .
           file: deploy/docker/backend.Dockerfile
           push: true
-          tags: ghcr.io/crozzbite/dndapp-api:${{ steps.tag.outputs.short }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ env.GHCR_API_PACKAGE }}:${{ steps.tag.outputs.short }}
           labels: |
             org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
-            org.opencontainers.image.source=https://github.com/crozzbite/DnDApp
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
 
       - name: Build and push Web image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -64,16 +69,16 @@ jobs:
           context: .
           file: deploy/docker/frontend.Dockerfile
           push: true
-          tags: ghcr.io/crozzbite/dndapp-web:${{ steps.tag.outputs.short }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ env.GHCR_WEB_PACKAGE }}:${{ steps.tag.outputs.short }}
           labels: |
             org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
-            org.opencontainers.image.source=https://github.com/crozzbite/DnDApp
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
 
       - name: Summary
         run: |
           echo "### Images pushed" >> "$GITHUB_STEP_SUMMARY"
-          echo "- \`ghcr.io/crozzbite/dndapp-api:${{ steps.tag.outputs.short }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- \`ghcr.io/crozzbite/dndapp-web:${{ steps.tag.outputs.short }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`ghcr.io/${{ github.repository_owner }}/${{ env.GHCR_API_PACKAGE }}:${{ steps.tag.outputs.short }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`ghcr.io/${{ github.repository_owner }}/${{ env.GHCR_WEB_PACKAGE }}:${{ steps.tag.outputs.short }}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # JD P0: skipped build-and-push must fail the workflow (GitHub marks all-skipped as Success)
   require-build:
