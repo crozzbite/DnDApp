@@ -30,7 +30,7 @@ FILE_PATTERNS="*.ts,*.tsx,*.js,*.jsx,*.yml,*.yaml,*.md"
 # Examples:
 #   EXCLUDE_PATTERNS="*.test.ts,*.spec.ts"
 #   EXCLUDE_PATTERNS="*_test.go,*.mock.ts"
-EXCLUDE_PATTERNS="*.test.ts,*.spec.ts,*.test.tsx,*.spec.tsx,*.d.ts,docs/deployment/COMMAND-REFERENCE.md"
+EXCLUDE_PATTERNS="*.test.ts,*.spec.ts,*.test.tsx,*.spec.tsx,*.d.ts,docs/deployment/archive/**"
 
 # File containing code review rules
 # Default: AGENTS.md
