@@ -9,6 +9,7 @@ node_modules/
 Thumbs.db
 *.log
 .env
+deploy/local.env.ps1
 
 # Layer: Armor (Backend)
 /backend/node_modules/
