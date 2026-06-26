@@ -4,12 +4,15 @@
 # Usage:
 #   .\deploy\k8s\scripts\Build-Overlay.ps1 -Environment dev
 #   .\deploy\k8s\scripts\Build-Overlay.ps1 -Environment dev -Apply
+#   .\deploy\k8s\scripts\Build-Overlay.ps1 -Environment test -ImageTag a26b5a9 -Apply
 #   .\deploy\k8s\scripts\Build-Overlay.ps1 -Environment all -Apply
 
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('dev', 'test', 'qa', 'stage', 'prod', 'all')]
     [string]$Environment,
+
+    [string]$ImageTag,
 
     [switch]$Apply
 )
@@ -29,7 +32,8 @@ $config = Get-Content $configPath -Raw | ConvertFrom-Json
 function Write-OverlayFiles {
     param(
         [string]$EnvKey,
-        [pscustomobject]$EnvConfig
+        [pscustomobject]$EnvConfig,
+        [string]$Tag
     )
 
     $outDir = Join-Path $generatedRoot $EnvKey
@@ -138,7 +142,20 @@ patches:
       name: dndapp
 "@ | Set-Content -Path (Join-Path $outDir 'kustomization.yaml') -Encoding utf8
 
-    Write-Host "Generated overlay: $outDir (namespace=$ns, host=$ingressHost)"
+    if ($Tag) {
+        @"
+
+images:
+  - name: ghcr.io/crozzbite/dndapp-api
+    newName: ghcr.io/crozzbite/dndapp-api
+    newTag: $Tag
+  - name: ghcr.io/crozzbite/dndapp-web
+    newName: ghcr.io/crozzbite/dndapp-web
+    newTag: $Tag
+"@ | Add-Content -Path (Join-Path $outDir 'kustomization.yaml') -Encoding utf8
+    }
+
+    Write-Host "Generated overlay: $outDir (namespace=$ns, host=$ingressHost$(if ($Tag) { ", tag=$Tag" }))"
     return $outDir
 }
 
@@ -169,7 +186,7 @@ foreach ($key in $envKeys) {
     if (-not $envConfig) {
         throw "Unknown environment in config: $key"
     }
-    $outDir = Write-OverlayFiles -EnvKey $key -EnvConfig $envConfig
+    $outDir = Write-OverlayFiles -EnvKey $key -EnvConfig $envConfig -Tag $ImageTag
     Invoke-Overlay -OutDir $outDir
 }
 

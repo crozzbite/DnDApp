@@ -253,8 +253,8 @@ Promote **the same SHA** across namespaces. Production may pin `@sha256:...` for
 
 **Phase 3:** ✅ COMPLETE (2026-06-22) — AKS `aks-dndapp`, five namespaces, Ingress smoke.  
 **Phase 3.5:** ✅ COMPLETE (2026-06-25) — `/health` vs `/ready`, GHCR digest, AKS smoke ×5, lint/test/build green.  
-**Phase 4:** 🔄 IN PROGRESS — **CI v1 ✅** (2026-06-25, `dndapp-ci.yml`, PR #3/#4); next: **CD GHCR** (Step D)  
-**Follow:** `docs/deployment/phase-4-checklist.md` · **Commands:** `docs/deployment/COMMAND-REFERENCE.md` §18 (CI) · §17 (AKS)
+**Phase 4:** 🔄 IN PROGRESS — **CI v1 ✅** · **CD GHCR ✅** · **CD Deploy OIDC → dnd-test** (Step E, verify first run)  
+**Follow:** `docs/deployment/phase-4-checklist.md` · **Commands:** `COMMAND-REFERENCE.md` §18g (deploy OIDC)
 
 ---
 

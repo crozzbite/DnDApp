@@ -126,26 +126,25 @@ Planned jobs (minimal v1):
 
 ### D. CD — build + push to GHCR (after CI green)
 
-Second workflow file (or `workflow` section in same repo — decide when implementing):
+Workflow: `.github/workflows/dndapp-cd-build.yml`
 
-```text
-.github/workflows/cd-build-push.yml   # name TBD
-```
+- [x] Trigger: `workflow_run` after green CI on push to `master`
+- [x] Build `deploy/docker/backend.Dockerfile` + `frontend.Dockerfile`
+- [x] Tag with `git rev-parse --short HEAD`
+- [x] Push to `ghcr.io/crozzbite/dndapp-api` + `dndapp-web`
+- [x] `GITHUB_TOKEN` + Manage Actions access (Write) on both GHCR packages
+- [x] Verified green: run `28207520768` (tag `722e2ca`)
 
-- [ ] Trigger: `push` to `main` only (or merge event)
-- [ ] Build `deploy/docker/backend.Dockerfile` + `frontend.Dockerfile`
-- [ ] Tag with `git rev-parse --short HEAD`
-- [ ] Push to `ghcr.io/crozzbite/dndapp-api` + `dndapp-web`
-- [ ] Use `GITHUB_TOKEN` or `ghcr` PAT via **GitHub Secret** — never commit token
-- [ ] Package visibility linked to `crozzbite/DnDApp` (from Phase 2)
+### E. CD — deploy to `dnd-test` on AKS (OIDC)
 
-### E. CD — deploy to `dnd-test` on AKS
+Workflow: `.github/workflows/dndapp-cd-deploy.yml`  
+Bootstrap (once): `deploy/scripts/bootstrap-github-oidc.ps1 -SetGitHubSecrets`
 
-- [ ] `az aks start` before first deploy drill
-- [ ] GitHub Secret / OIDC for Azure + kubeconfig (no kubeconfig file in repo)
-- [ ] Workflow updates image tag in overlay or runs `Build-Overlay.ps1 -Environment test`
-- [ ] `kubectl apply` (or script) targets **`dnd-test`** only
-- [ ] Smoke: **`/ready` 200** + `/health` on test Ingress (or port-forward)
+- [x] App Registration + federated credential (`repo:crozzbite/DnDApp:ref:refs/heads/master`)
+- [x] GitHub Secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`
+- [x] `Build-Overlay.ps1 -Environment test -ImageTag <sha> -Apply`
+- [ ] Verify first green deploy run on GitHub Actions
+- [ ] Smoke: **`/ready` 200** + `/health` via Ingress (workflow step)
 - [ ] `az aks stop` after drill if not continuing same session
 
 ### F. Promotion — qa / stage / prod (manual gate)
@@ -206,4 +205,4 @@ Parked for later phases:
 
 ## Current step
 
-**→ Step D:** CD build + push GHCR (`dndapp-cd-build.yml`). Preflight: `gh auth status` ✅ · local `master` synced.
+**→ Step E:** Verify first OIDC deploy to `dnd-test` (`dndapp-cd-deploy.yml`). Bootstrap ✅ · push to trigger chain.

@@ -1,0 +1,109 @@
+# DnDApp — CD Deploy v1 (Phase 4 Step E)
+# OIDC → Azure → AKS dnd-test. Sin Key Vault. Sin kubeconfig en secret.
+
+name: DnDApp CD Deploy
+
+on:
+  workflow_run:
+    workflows: ["DnDApp CD Build"]
+    types: [completed]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: dndapp-cd-deploy-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+env:
+  AZURE_RESOURCE_GROUP: rg-dndapp-learn
+  AZURE_AKS_CLUSTER: aks-dndapp
+  DEPLOY_ENVIRONMENT: test
+  INGRESS_HOST: dnd-test.local
+
+jobs:
+  deploy-test:
+    name: Deploy to dnd-test (AKS)
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout commit from CD Build run
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set image tag (short SHA)
+        id: tag
+        run: echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Start AKS if stopped
+        shell: bash
+        run: |
+          set -euo pipefail
+          state=$(az aks show -g "$AZURE_RESOURCE_GROUP" -n "$AZURE_AKS_CLUSTER" --query powerState.code -o tsv)
+          echo "AKS powerState: $state"
+          if [ "$state" = "Stopped" ]; then
+            echo "Starting cluster (may take several minutes)..."
+            az aks start -g "$AZURE_RESOURCE_GROUP" -n "$AZURE_AKS_CLUSTER"
+            for i in $(seq 1 36); do
+              state=$(az aks show -g "$AZURE_RESOURCE_GROUP" -n "$AZURE_AKS_CLUSTER" --query powerState.code -o tsv)
+              echo "  wait $i/36: $state"
+              [ "$state" = "Running" ] && break
+              sleep 20
+            done
+            [ "$state" = "Running" ] || { echo "AKS did not reach Running"; exit 1; }
+          fi
+
+      - name: Configure kubectl
+        run: |
+          az aks get-credentials \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_AKS_CLUSTER" \
+            --overwrite-existing
+          kubectl get nodes
+
+      - name: Apply overlay (test + image tag)
+        shell: pwsh
+        run: |
+          ./deploy/k8s/scripts/Build-Overlay.ps1 `
+            -Environment ${{ env.DEPLOY_ENVIRONMENT }} `
+            -ImageTag "${{ steps.tag.outputs.short }}" `
+            -Apply
+
+      - name: Wait for rollouts
+        run: |
+          kubectl rollout status deployment/api -n dnd-test --timeout=300s
+          kubectl rollout status deployment/web -n dnd-test --timeout=300s
+
+      - name: Smoke test (Ingress /ready + /health)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ip=$(kubectl get svc -n ingress-nginx ingress-nginx-controller \
+            -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Ingress IP: $ip"
+          curl -sf -H "Host: ${{ env.INGRESS_HOST }}" "http://${ip}/ready" | tee /tmp/ready.json
+          curl -sf -H "Host: ${{ env.INGRESS_HOST }}" "http://${ip}/health" | tee /tmp/health.json
+          grep -q '"status":"ready"' /tmp/ready.json
+          grep -q '"status":"ok"' /tmp/health.json
+
+      - name: Summary
+        run: |
+          echo "### Deployed to dnd-test" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image tag: \`${{ steps.tag.outputs.short }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Host: \`${{ env.INGRESS_HOST }}\`" >> "$GITHUB_STEP_SUMMARY"
+          kubectl get deploy -n dnd-test \
+            -o custom-columns='NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image'

@@ -1320,9 +1320,47 @@ gh pr view --json statusCheckRollup,url
 | PR #4 CI | `28205247965` | `/health` + contract tests |
 | PR #4 merge → master | `28205354984` | Post-merge CI |
 
-### 18f. CD (Step D — not yet automated)
+### 18f. CD Build (Step D — automated)
 
-Next workflow (planned): `.github/workflows/dndapp-cd-build.yml` — Docker build + push to GHCR on merge to `master`. Requires `write:packages` (`gh auth status`). See [phase-4-checklist.md](./phase-4-checklist.md) Step D.
+Workflow: `.github/workflows/dndapp-cd-build.yml` — triggers after green **DnDApp CI** on push to `master`.
+
+- Builds + pushes `ghcr.io/crozzbite/dndapp-api:<short-sha>` and `dndapp-web:<short-sha>`
+- Auth: `GITHUB_TOKEN` + **Manage Actions access → Write** on both GHCR packages
+
+```powershell
+gh run list --workflow "DnDApp CD Build" --limit 3
+```
+
+### 18g. CD Deploy — OIDC to AKS (Step E)
+
+**One-time bootstrap (local, `az login`):**
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
+.\deploy\scripts\bootstrap-github-oidc.ps1 -SetGitHubSecrets
+```
+
+Creates App Registration `dndapp-github-actions`, federated credential for `repo:crozzbite/DnDApp:ref:refs/heads/master`, roles on `aks-dndapp`, and GitHub secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`. **No** client secret, **no** kubeconfig in GitHub.
+
+**Workflow:** `.github/workflows/dndapp-cd-deploy.yml` — after green **DnDApp CD Build**:
+
+1. `azure/login@v2` (OIDC)
+2. `az aks start` if cluster stopped
+3. `Build-Overlay.ps1 -Environment test -ImageTag <sha> -Apply`
+4. Smoke: `curl` `/ready` + `/health` with `Host: dnd-test.local`
+
+```powershell
+gh run list --workflow "DnDApp CD Deploy" --limit 3
+gh run watch
+```
+
+**Manual deploy same tag (local):**
+
+```powershell
+kubectl config use-context aks-dndapp
+.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment test -ImageTag 722e2ca -Apply
+curl.exe http://dnd-test.local/ready
+```
 
 ---
 
