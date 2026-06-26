@@ -36,7 +36,7 @@ Backend **Nexus Gateway** for DnDApp: compendium search, BullMQ workers, Redis-b
 
 ### Pull (cluster)
 
-Requires `imagePullSecrets: ghcr-pull` in each namespace (see [COMMAND-REFERENCE §16f](./COMMAND-REFERENCE.md#16f-private-package--cluster-needs-a-pull-secret)).
+Requires `imagePullSecrets: ghcr-pull` in each namespace (see [COMMAND-REFERENCE §2](./COMMAND-REFERENCE.md#ghcr-pull-secret-once-per-namespace-or-after-token-expiry)).
 
 ### Traceability
 
@@ -112,7 +112,7 @@ flowchart LR
 
 **Actions access:** each package needs **Manage Actions access → DnDApp → Write** (not just repo link).
 
-Full diagrams: [COMMAND-REFERENCE §0](./COMMAND-REFERENCE.md#0-visual-maps-high-signal).
+Full diagrams: [COMMAND-REFERENCE §0](./COMMAND-REFERENCE.md#0-visual-maps).
 
 ---
 

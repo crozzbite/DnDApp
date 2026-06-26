@@ -198,7 +198,7 @@ Tools: `kubectl`, `kustomize`, optional `helm`.
 
 **Goal:** GitHub Actions — build, test, push image; deploy to `dnd-test` automatically; promote to QA/stage/prod with **manual workflow approval**.
 
-**Status:** ✅ Complete for learning objectives (2026-06-26). Auto chain: `master` push → CI → CD Build → CD Deploy → `dnd-test`. Manual promote for qa/stage/prod (§18h).
+**Status:** ✅ Complete for learning objectives (2026-06-26). Auto chain: `master` push → CI → CD Build → CD Deploy → `dnd-test`. Manual promote for qa/stage/prod ([COMMAND-REFERENCE §3h](./COMMAND-REFERENCE.md#3h-manual-promotion)).
 
 ---
 
@@ -257,7 +257,7 @@ Promote **the same SHA** across namespaces. Production may pin `@sha256:...` for
 **Phase 3.5:** ✅ COMPLETE (2026-06-25) — `/health` vs `/ready`, GHCR digest, AKS smoke ×5, lint/test/build green.  
 **Phase 4:** ✅ **COMPLETE** (learning track) — CI + CD Build + CD Deploy (`dnd-test`) + gga + docs (2026-06-26). Commit ref `de48622`.  
 **Deferred (not blocking):** Step F GitHub `environment:` reviewers; custom domain TLS; observability.  
-**Follow:** [phase-4-checklist.md](./phase-4-checklist.md) · **Commands:** [COMMAND-REFERENCE.md §0 + §18](./COMMAND-REFERENCE.md) · **Packages:** [ghcr-packages.md](./ghcr-packages.md)
+**Follow:** [phase-4-checklist.md](./phase-4-checklist.md) · **Runbook:** [COMMAND-REFERENCE.md](./COMMAND-REFERENCE.md) · **Archive:** [phases 0–3 manual](./archive/COMMAND-REFERENCE-phases-0-3-manual.md) · **Packages:** [ghcr-packages.md](./ghcr-packages.md)
 
 ---
 
