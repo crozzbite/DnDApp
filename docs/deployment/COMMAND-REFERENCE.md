@@ -1,6 +1,6 @@
 # DnDApp — Deployment command reference
 
-**Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
+**Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md) · **Standard:** [skullrender-cicd-standard.md](./skullrender-cicd-standard.md) (canon: `WorkDesktop/docs/refined-rules/skullrender-cicd-standard.md`)  
 **Purpose:** Day-to-day ops after Phase 4 — CI/CD, AKS, promote, troubleshoot.  
 **Shell:** PowerShell on Windows — chain with `;` (not `&&`).
 
