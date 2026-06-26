@@ -38,7 +38,114 @@ cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
 | **CI — local preflight** | 4 | [§18a](#18a-local-preflight-mirror-ci) |
 | **CI — PR + monitor (`gh`)** | 4 | [§18c](#18c-pr-merge-to-master) · [§18d](#18d-monitor-ci-from-terminal) |
 | **CI — troubleshoot** | 4 | [§18e](#18e-ci-troubleshoot) |
-| CD build + push (GHCR) | 4 | §18 — **Step D (next)** |
+| CD build + push (GHCR) | 4 | [§18f](#18f-cd-build-step-d--automated) |
+| CD deploy OIDC → `dnd-test` | 4 | [§18g](#18g-cd-deploy--oidc-to-aks-step-e) |
+| Manual promote qa / stage / prod | 4 | [§18h](#18h-manual-promotion-qa--stage--prod) |
+| **Visual maps** (DAGs + states) | all | [§0](#0-visual-maps-high-signal) |
+| GHCR package docs | 2 / 4 | [ghcr-packages.md](./ghcr-packages.md) |
+
+---
+
+## 0. Visual maps (high-signal)
+
+Read-only diagrams — no secrets, no subscription IDs. Use with [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md).
+
+### 0a. Learning path (Phases 0 → 4)
+
+```mermaid
+flowchart LR
+  P0["Phase 0<br/>Compose local"]
+  P1["Phase 1<br/>kind + K8s"]
+  P2["Phase 2<br/>GHCR manual"]
+  P3["Phase 3<br/>AKS ×5 ns"]
+  P4["Phase 4<br/>CI/CD Actions"]
+  P0 --> P1 --> P2 --> P3 --> P4
+```
+
+| Phase | You learn | Automates later |
+|-------|-----------|-----------------|
+| 0 | `docker compose`, health, rollback | — |
+| 1 | ConfigMap, Secret, Ingress, kind | — |
+| 2 | Build, tag SHA, push GHCR, pull secret | CD Build (§18f) |
+| 3 | AKS, five namespaces, Ingress smoke | CD Deploy (§18g) |
+| 4 | CI gates, OIDC, promotion policy | Full chain on `master` push |
+
+### 0b. CI/CD chain (push to `master`)
+
+```mermaid
+flowchart TD
+  PUSH["git push master"]
+  CI["DnDApp CI<br/>dndapp-ci.yml"]
+  BUILD["DnDApp CD Build<br/>dndapp-cd-build.yml"]
+  REQ["require-build job<br/>fail if skipped"]
+  DEPLOY["DnDApp CD Deploy<br/>dndapp-cd-deploy.yml"]
+  TEST["namespace dnd-test<br/>AKS aks-dndapp"]
+  PUSH --> CI
+  CI -->|"workflow_run success"| BUILD
+  BUILD --> REQ
+  REQ -->|"workflow_run success"| DEPLOY
+  DEPLOY --> TEST
+```
+
+| Workflow | Trigger | Auth | Output |
+|----------|---------|------|--------|
+| `dndapp-ci.yml` | PR + push → `master` | none (read-only) | lint / test / build green |
+| `dndapp-cd-build.yml` | after green CI | `GITHUB_TOKEN` → GHCR | `dndapp-api:<sha>`, `dndapp-web:<sha>` |
+| `dndapp-cd-deploy.yml` | after green CD Build | Azure OIDC (`AZURE_*` secrets) | overlay `test` + smoke |
+
+**Verified reference (2026-06-26):** commit `de48622` → CI `28211995715` → CD Build `28212025300` → CD Deploy `28212090887`.
+
+### 0c. Promotion state (five namespaces)
+
+```mermaid
+stateDiagram-v2
+  [*] --> dnd_dev: manual / local practice
+  dnd_dev --> dnd_test: CD Deploy auto on master
+  dnd_test --> dnd_qa: manual Build-Overlay §18h
+  dnd_qa --> dnd_stage: manual §18h
+  dnd_stage --> dnd_prod: manual §18h + human gate
+  note right of dnd_test
+    Same image tag (git SHA)
+    ConfigMap differs per ns
+  end note
+```
+
+| Namespace | Host (lab) | Deployer | Gate |
+|-----------|------------|----------|------|
+| `dnd-dev` | `dnd-dev.local` | You (local) | — |
+| `dnd-test` | `dnd-test.local` | **GitHub Actions** | CI + CD Build green |
+| `dnd-qa` | `dnd-qa.local` | You (manual) | smoke after apply |
+| `dnd-stage` | `dnd-stage.local` | You (manual) | pre-prod parity check |
+| `dnd-prod` | `dnd-prod.local` | You (manual) | explicit approval |
+
+Step F (GitHub `environment:` reviewers for qa/stage/prod) is **deferred** — manual promote is current canon.
+
+### 0d. Image lifecycle (SHA tag)
+
+```mermaid
+flowchart LR
+  COMMIT["git commit"]
+  CI_BUILD["CI builds source"]
+  DOCKER["CD Build Docker push"]
+  GHCR["GHCR private packages"]
+  K8S["Build-Overlay -ImageTag sha -Apply"]
+  PODS["Pods pull by tag"]
+  COMMIT --> CI_BUILD --> DOCKER --> GHCR --> K8S --> PODS
+```
+
+**Convention:** `ghcr.io/crozzbite/dndapp-api:<short-sha>` and `dndapp-web:<short-sha>`. No `:latest` in CI. Prod may pin `@sha256:…` for immutability.
+
+> 🚨 Cerbero: packages stay **Private**. Never commit PATs, kubeconfig, or `AZURE_*` values — only secret **names** in docs.
+
+### 0e. API docs vs deployment docs (don't mix)
+
+| Doc type | Where | When available |
+|----------|-------|----------------|
+| **Swagger / OpenAPI** | `http://localhost:3000/docs` | `NODE_ENV ≠ production` only |
+| **Deployment runbooks** | this file + checklists | always (repo) |
+| **GHCR package pages** | GitHub Packages UI | after push; see [ghcr-packages.md](./ghcr-packages.md) |
+
+Swagger documents **REST contracts** (`/v1/compendium/…`, health). It does **not** replace CI/CD or kubectl workflows.
 
 ---
 
@@ -1170,11 +1277,10 @@ az aks stop --resource-group $RG --name $CLUSTER
 
 ---
 
-## 18. Phase 4 — CI (GitHub Actions)
+## 18. Phase 4 — CI/CD (GitHub Actions)
 
-**Status:** ✅ CI v1 live on `master` (2026-06-25) — PR #3 (workflow) + PR #4 (`/health`, Gentleman-Skills).  
-**Workflow file:** `.github/workflows/dndapp-ci.yml`  
-**Workflow name in Actions UI:** `DnDApp CI`  
+**Status:** ✅ CI + CD Build + CD Deploy (`dnd-test`) live on `master` (2026-06-26). Visual overview: [§0](#0-visual-maps-high-signal).  
+**Workflow files:** `dndapp-ci.yml` · `dndapp-cd-build.yml` · `dndapp-cd-deploy.yml`  
 **Default branch:** `master` (not `main`).
 
 **CI v1 scope:** lint + test + build only. **No** Redis in runner, **no** Docker build, **no** GHCR push, **no** AKS deploy, **no** Karma.
@@ -1322,14 +1428,40 @@ gh pr view --json statusCheckRollup,url
 
 ### 18f. CD Build (Step D — automated)
 
-Workflow: `.github/workflows/dndapp-cd-build.yml` — triggers after green **DnDApp CI** on push to `master`.
+**Status:** ✅ live (2026-06-26)  
+**Workflow:** `.github/workflows/dndapp-cd-build.yml`  
+**Trigger:** `workflow_run` after green **DnDApp CI** on push to `master`.
 
-- Builds + pushes `ghcr.io/crozzbite/dndapp-api:<short-sha>` and `dndapp-web:<short-sha>`
-- Auth: `GITHUB_TOKEN` + **Manage Actions access → Write** on both GHCR packages
+```mermaid
+sequenceDiagram
+  participant CI as DnDApp CI
+  participant CD as CD Build
+  participant GHCR as GHCR (private)
+  CI->>CD: workflow_run success
+  CD->>CD: checkout head_sha
+  CD->>CD: docker build api + web
+  CD->>GHCR: push :short-sha only
+  CD->>CD: require-build gate
+```
+
+| Step | What |
+|------|------|
+| Checkout | `ref: workflow_run.head_sha` (same commit CI tested) |
+| Tag | `git rev-parse --short HEAD` → e.g. `de48622` |
+| Push | `ghcr.io/crozzbite/dndapp-api:<sha>`, `dndapp-web:<sha>` |
+| Auth | `GITHUB_TOKEN` + **Manage Actions access → Write** on both packages |
+| Gate | Job `require-build` fails workflow if build job skipped |
+
+**Monitor:**
 
 ```powershell
-gh run list --workflow "DnDApp CD Build" --limit 3
+gh run list --workflow "DnDApp CD Build" --limit 5
+gh run watch <RUN_ID>
 ```
+
+**Verified green:** `28212025300` (tag `de48622`, post-JD hardening).
+
+Package README templates: [ghcr-packages.md](./ghcr-packages.md).
 
 ### 18g. CD Deploy — OIDC to AKS (Step E)
 
@@ -1342,25 +1474,89 @@ cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
 
 Creates App Registration `dndapp-github-actions`, federated credential for `repo:crozzbite/DnDApp:ref:refs/heads/master`, roles on `aks-dndapp`, and GitHub secrets `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`. **No** client secret, **no** kubeconfig in GitHub.
 
-**Workflow:** `.github/workflows/dndapp-cd-deploy.yml` — after green **DnDApp CD Build**:
+**Status:** ✅ live (2026-06-26)  
+**Workflow:** `.github/workflows/dndapp-cd-deploy.yml` — after green **DnDApp CD Build**.
 
-1. `azure/login@v2` (OIDC)
-2. `az aks start` if cluster stopped
-3. `Build-Overlay.ps1 -Environment test -ImageTag <sha> -Apply`
-4. Smoke: `curl` `/ready` + `/health` with `Host: dnd-test.local`
+```mermaid
+flowchart TD
+  A["Verify upstream CD Build job"]
+  B["Checkout head_sha"]
+  C["azure/login OIDC"]
+  D["az aks start if Stopped"]
+  E["kubectl get-credentials"]
+  F["Build-Overlay test -ImageTag sha -Apply"]
+  G["rollout status api + web"]
+  H["verify pod image tags"]
+  I["smoke /ready + /health"]
+  A --> B --> C --> D --> E --> F --> G --> H --> I
+```
+
+| Step | Detail |
+|------|--------|
+| Upstream gate | `gh api` confirms CD Build job `Build + push GHCR` succeeded |
+| Target | namespace `dnd-test`, host `dnd-test.local` |
+| Cluster | `aks-dndapp` in `rg-dndapp-learn` |
+| Secrets (names only) | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` |
+| Bootstrap (once) | `bootstrap-github-oidc.ps1 -SetGitHubSecrets` (+ optional `-ApplyK8sRbac`) |
+
+**Monitor:**
 
 ```powershell
-gh run list --workflow "DnDApp CD Deploy" --limit 3
-gh run watch
+gh run list --workflow "DnDApp CD Deploy" --limit 5
+gh run watch <RUN_ID>
 ```
+
+**Verified green:** `28212090887` (tag `de48622`, Ingress smoke OK).
 
 **Manual deploy same tag (local):**
 
 ```powershell
 kubectl config use-context aks-dndapp
-.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment test -ImageTag 722e2ca -Apply
-curl.exe http://dnd-test.local/ready
+$tag = git rev-parse --short HEAD
+.\deploy\k8s\scripts\Build-Overlay.ps1 -Environment test -ImageTag $tag -Apply
+curl.exe -H "Host: dnd-test.local" http://<INGRESS_IP>/ready
 ```
+
+Replace `<INGRESS_IP>` from `kubectl get svc -n ingress-nginx ingress-nginx-controller` — do not hardcode in shared docs.
+
+### 18h. Manual promotion (qa / stage / prod)
+
+**Policy:** only `dnd-test` is automated. Promote the **same SHA** already in GHCR — no rebuild.
+
+```mermaid
+flowchart LR
+  TEST["dnd-test auto"]
+  QA["dnd-qa manual"]
+  STG["dnd-stage manual"]
+  PRD["dnd-prod manual"]
+  TEST --> QA --> STG --> PRD
+```
+
+```powershell
+cd C:\Users\zzorc\OneDrive\Desktop\WorkDesktop\DnDApp
+kubectl config use-context aks-dndapp
+
+# Pin the SHA you validated in test (from gh run or git)
+$tag = "de48622"   # or: git rev-parse --short HEAD
+
+foreach ($env in @("qa", "stage", "prod")) {
+  .\deploy\k8s\scripts\Build-Overlay.ps1 -Environment $env -ImageTag $tag -Apply
+  kubectl rollout status deployment/api -n "dnd-$env"
+  kubectl rollout status deployment/web -n "dnd-$env"
+}
+
+# Smoke one host per env (hosts file → Ingress IP)
+curl.exe http://dnd-qa.local/ready
+curl.exe http://dnd-stage.local/ready
+curl.exe http://dnd-prod.local/ready
+```
+
+| Check | Command |
+|-------|---------|
+| Same tag everywhere | `kubectl get deploy -A -l app.kubernetes.io/part-of=dndapp -o custom-columns='NS:.metadata.namespace,IMAGE:.spec.template.spec.containers[0].image'` |
+| Config differs per env | `kubectl get configmap dndapp-config -n dnd-qa -o yaml` (compare `FRONTEND_URL`, etc.) |
+
+**Already verified:** all five namespaces at tag `0c51991` with `/ready` ×5 (manual session 2026-06-26).
 
 ---
 
