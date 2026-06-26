@@ -13,15 +13,40 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$AppDisplayName = 'dndapp-github-actions'
-$GitHubOrg = 'crozzbite'
-$GitHubRepo = 'DnDApp'
-$Branch = 'master'
-$RG = 'rg-dndapp-learn'
-$Cluster = 'aks-dndapp'
-$DeployNamespace = 'dnd-test'
-$FederatedName = 'github-dndapp-master'
+$repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$localEnv = Join-Path $repoRoot 'deploy\local.env.ps1'
+if (Test-Path $localEnv) {
+    . $localEnv
+} else {
+    Write-Warning "Missing deploy\local.env.ps1 — copy from local.env.ps1.example"
+}
 
+function Get-GhRepoOwner {
+    $v = gh repo view --json owner -q '.owner.login' 2>$null
+    if ($LASTEXITCODE -ne 0) { return '' }
+    return "$v".Trim()
+}
+
+function Get-GhRepoName {
+    $v = gh repo view --json name -q '.name' 2>$null
+    if ($LASTEXITCODE -ne 0) { return '' }
+    return "$v".Trim()
+}
+
+$GitHubOrg = if ($DndGitHubOrg) { $DndGitHubOrg } else { Get-GhRepoOwner }
+$GitHubRepo = if ($DndGitHubRepo) { $DndGitHubRepo } else { Get-GhRepoName }
+$Branch = if ($DndDefaultBranch) { $DndDefaultBranch } else { 'master' }
+$RG = $DndAzureResourceGroup
+$Cluster = $DndAksCluster
+$DeployNamespace = if ($DndNamespacePrefix -and $DndCdDeployEnvironment) {
+    "$DndNamespacePrefix-$DndCdDeployEnvironment"
+} else { 'app-test' }
+$AppDisplayName = if ($DndOidcAppDisplayName) { $DndOidcAppDisplayName } else { "$GitHubRepo-github-actions" }
+$FederatedName = if ($DndOidcFederatedCredentialName) { $DndOidcFederatedCredentialName } else { "github-$GitHubRepo-$Branch" }
+
+if (-not $RG -or -not $Cluster) {
+    throw 'Set DndAzureResourceGroup and DndAksCluster in deploy\local.env.ps1'
+}
 function Remove-RoleAssignmentIfExists {
     param(
         [string]$Assignee,
@@ -65,7 +90,7 @@ $federatedJson = @{
     name        = $FederatedName
     issuer      = 'https://token.actions.githubusercontent.com'
     subject     = $subject
-    description = 'DnDApp CD deploy on push to master'
+    description = "CD deploy on push to $Branch"
     audiences   = @('api://AzureADTokenExchange')
 } | ConvertTo-Json -Compress
 
@@ -134,7 +159,7 @@ if ($SetGitHubSecrets) {
     gh secret set AZURE_TENANT_ID --body $TenantId
     gh secret set AZURE_SUBSCRIPTION_ID --body $SubscriptionId
     Pop-Location
-    Write-Host "Secrets set on crozzbite/DnDApp"
+    Write-Host "Secrets set on ${GitHubOrg}/${GitHubRepo}"
 }
 
 Write-Host "`nDone. Contributor is cluster-scoped (aks start/stop). K8s deploy scoped via RoleBinding in $DeployNamespace." -ForegroundColor Green
