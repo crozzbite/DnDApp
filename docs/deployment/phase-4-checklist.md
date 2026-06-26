@@ -3,7 +3,7 @@
 **Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
 **Command snippets:** [COMMAND-REFERENCE.md §18](./COMMAND-REFERENCE.md#18-phase-4--cicd-github-actions) — CI complete; CD subsection §18f pending  
 **Status:** ✅ **COMPLETE** (2026-06-26) — learning track closed; Step F (GitHub environments) deferred  
-**Command snippets:** [COMMAND-REFERENCE.md](./COMMAND-REFERENCE.md) — §0 visual maps · §18 CI/CD · [ghcr-packages.md](./ghcr-packages.md)
+**Command snippets:** [COMMAND-REFERENCE.md](./COMMAND-REFERENCE.md) — §0 maps · §3 CI/CD · [ghcr-packages.md](./ghcr-packages.md)
 
 **Learning mode:** one step at a time — agent explains, **you run commands**. Do not skip ahead to CD until CI passes on GitHub.
 
