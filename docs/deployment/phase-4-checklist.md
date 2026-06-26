@@ -1,11 +1,9 @@
 # Phase 4 — CI/CD (GitHub Actions) checklist
 
 **Parent:** [DEPLOYMENT-MASTER-PLAN.md](./DEPLOYMENT-MASTER-PLAN.md)  
-**Command snippets:** [COMMAND-REFERENCE.md §18](./COMMAND-REFERENCE.md#18-phase-4--cicd-github-actions) — CI complete; CD subsection §18f pending  
-**Status:** ✅ **COMPLETE** (2026-06-26) — learning track closed; Step F (GitHub environments) deferred  
-**Command snippets:** [COMMAND-REFERENCE.md](./COMMAND-REFERENCE.md) — §0 maps · §3 CI/CD · [ghcr-packages.md](./ghcr-packages.md)
-
-**Learning mode:** one step at a time — agent explains, **you run commands**. Do not skip ahead to CD until CI passes on GitHub.
+**Status:** ✅ **COMPLETE** (2026-06-26) — SkullRender standard: [skullrender-cicd-standard.md](./skullrender-cicd-standard.md)  
+**Runbook:** [COMMAND-REFERENCE.md](./COMMAND-REFERENCE.md) · **Packages:** [ghcr-packages.md](./ghcr-packages.md)  
+**Deferred:** Step F (GitHub `environment:` reviewers for qa/stage/prod auto-gates)
 
 ---
 
@@ -15,8 +13,8 @@
 - [x] Phase 2 complete (GHCR manual push + digest deploy)
 - [x] AKS `powerState: Stopped` when not practicing deploy (`az aks stop` after 2026-06-25 smoke)
 - [x] `gh auth status` → `repo`, `workflow`, `write:packages` (2026-06-25)
-- [ ] Git remote clean — **no PAT in URL** ([DEPLOYMENT-MASTER-PLAN §4](./DEPLOYMENT-MASTER-PLAN.md#4-security-prerequisite-do-before-phase-0-push))
-- [ ] Confirm **cost budget** — GitHub Actions free minutes + AKS only running during deploy drills
+- [x] Git remote clean — no PAT in URL (audited 2026-06-26)
+- [x] Cost control documented — `az aks stop` + `[skip ci]` for doc-only pushes
 
 ---
 
