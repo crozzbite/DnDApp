@@ -1,55 +1,39 @@
-# SkullRender Nexus: DnDApp
+GHCR packages — DnDApp
+Registry: GitHub Container Registry
+Owner: crozzbite
+Visibility: Private (required — never public)
+Source repo: crozzbite/DnDApp
 
-Bienvenido al sistema **Nexus**, una solución integral para el multiverso D&D bajo la arquitectura de **SkullRender**.
+Copy sections below into each package’s README on GitHub (Package → Settings → Description / README) if the UI still shows generic auto text.
 
-## 🏗️ Estructura del Proyecto
+Package: dndapp-api
+Field	Value
+Image	ghcr.io/crozzbite/dndapp-api:<git-sha-short>
+Dockerfile	deploy/docker/backend.Dockerfile
+Runtime	Node 22 alpine (NestJS + Fastify)
+Build stage	bun 1.3.9 alpine
+Exposed port	3000
+Health	GET /health (liveness), GET /ready (Redis readiness)
+API prefix	/v1
+What it is
+Backend Nexus Gateway for DnDApp: compendium search, BullMQ workers, Redis-backed queues. Stateless HTTP pods; Redis holds queue state.
 
-El proyecto se divide en dos dominios principales siguiendo el principio de separación de preocupaciones:
+Tags
+Tag pattern	Source	Use
+<short-sha> e.g. de48622	CD Build on master	Deploy to K8s (Build-Overlay -ImageTag)
+@sha256:…	GHCR digest	Immutable pin (recommended for prod)
+No :latest in automated CI — only SHA tags.
 
-- **`/frontend`**: Capa de la Piel (Flesh). Aplicación Angular 19+ utilizando Signals y SSR.
-- **`/backend`**: Capa de la Armadura y Cerebro (Armor & Brain). API NestJS con workers de ingesta distribuida.
-- **`/openspec`**: Especificaciones técnicas y arquitectónicas del sistema.
-- **`/.agent`**: Capacidad cognitiva y habilidades de SkullRender.
+Pull (cluster)
+Requires imagePullSecrets: ghcr-pull in each namespace (see COMMAND-REFERENCE §16f).
 
----
+Traceability
+OCI label on image:
 
-## 📦 Despliegue (DevOps track)
-
-| Doc | Purpose |
-|-----|---------|
-| [DEPLOYMENT-MASTER-PLAN.md](docs/deployment/DEPLOYMENT-MASTER-PLAN.md) | Decision log + phase map |
-| [COMMAND-REFERENCE.md](docs/deployment/COMMAND-REFERENCE.md) | Copy-paste workflows + **§0 DAGs** |
-| [phase-4-checklist.md](docs/deployment/phase-4-checklist.md) | CI/CD close-out |
-| [ghcr-packages.md](docs/deployment/ghcr-packages.md) | GHCR package README templates |
-
-**API docs (Swagger):** `http://localhost:3000/docs` when running backend in dev — not the same as deployment runbooks.
-
----
-
-## 🚀 Inicio Rápido
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run start
-```
-
-### Backend
-
-```bash
+org.opencontainers.image.source=https://github.com/crozzbite/DnDApp
+Local run (dev)
 cd backend
-npm install
-npm run start:dev
-```
-
----
-
-## 🛡️ Estándares (The Skull Way)
-
-- **Radical Naming**: Sin sufijos redundantes.
-- **OnPush**: Estrategia de detección de cambios obligatoria.
-- **Signals**: Gestión de estado reactiva nativa.
-
+bun install
+bun run start:dev
+# Swagger (non-prod only): http://localhost:3000/docs
 _Bones + Brain = Rational Creativity._
